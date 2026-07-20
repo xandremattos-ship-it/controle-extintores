@@ -1,0 +1,3527 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Inspeção de Extintores</title>
+<meta name="theme-color" content="#12161b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Extintores">
+<meta name="description" content="Inspeção e controle de extintores com QR Code, checklist e relatório em PDF">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{
+  --bg:#12161b;
+  --panel:#1b2128;
+  --panel-2:#232b33;
+  --border:#333d47;
+  --border-soft:#2a323b;
+  --text:#e9edf1;
+  --muted:#8b96a3;
+  --muted-2:#5f6a76;
+  --accent:#e0432a;
+  --accent-dark:#a8301e;
+  --accent-glow:rgba(224,67,42,0.18);
+  --success:#3aa66b;
+  --success-bg:rgba(58,166,107,0.14);
+  --warning:#d9a441;
+  --warning-bg:rgba(217,164,65,0.14);
+  --danger:#e0432a;
+  --danger-bg:rgba(224,67,42,0.14);
+  --radius:10px;
+  --font-display:'Oswald',sans-serif;
+  --font-body:'Inter',sans-serif;
+  --font-mono:'IBM Plex Mono',monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-body);height:100%;}
+body{-webkit-font-smoothing:antialiased;}
+button{font-family:inherit;cursor:pointer;}
+input,select,textarea{font-family:inherit;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:8px;}
+
+/* ===== layout shell ===== */
+#app{display:flex;min-height:100vh;}
+.sidebar{
+  width:230px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--border-soft);
+  display:flex;flex-direction:column;padding:20px 14px;position:sticky;top:0;height:100vh;
+}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 8px 22px 8px;border-bottom:1px solid var(--border-soft);margin-bottom:16px;}
+.brand-logo{width:36px;height:36px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;}
+.brand-logo img{width:100%;height:100%;object-fit:cover;}
+.brand-logo svg{width:20px;height:20px;}
+.brand-text{line-height:1.15;overflow:hidden;}
+.brand-text b{font-family:var(--font-display);font-size:15px;letter-spacing:.3px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.brand-text span{font-size:11px;color:var(--muted);}
+
+.nav{display:flex;flex-direction:column;gap:2px;}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--muted);
+  background:none;border:none;text-align:left;font-size:13.5px;font-weight:500;transition:.15s;
+}
+.nav-item svg{width:17px;height:17px;flex-shrink:0;opacity:.8;}
+.nav-item:hover{background:var(--panel-2);color:var(--text);}
+.nav-item.active{background:var(--accent-glow);color:var(--accent);}
+.nav-item.active svg{opacity:1;}
+.sidebar-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--border-soft);font-size:11px;color:var(--muted-2);}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column;}
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;padding:16px 26px;border-bottom:1px solid var(--border-soft);
+  position:sticky;top:0;background:rgba(18,22,27,0.85);backdrop-filter:blur(6px);z-index:20;
+}
+.topbar h1{font-family:var(--font-display);font-size:20px;font-weight:600;margin:0;letter-spacing:.2px;}
+.topbar .sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.content{padding:22px 26px 90px 26px;flex:1;}
+
+/* mobile bottom nav */
+.bottom-nav{display:none;}
+
+/* ===== buttons ===== */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:8px;border:1px solid var(--border);
+  background:var(--panel-2);color:var(--text);font-size:13px;font-weight:600;white-space:nowrap;
+}
+.btn svg{width:15px;height:15px;}
+.btn:hover{border-color:var(--muted-2);}
+.btn-accent{background:var(--accent);border-color:var(--accent);color:#fff;}
+.btn-accent:hover{background:var(--accent-dark);border-color:var(--accent-dark);}
+.btn-ghost{background:none;border-color:transparent;}
+.btn-ghost:hover{background:var(--panel-2);}
+.btn-sm{padding:6px 11px;font-size:12px;}
+.btn-danger{color:var(--danger);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ===== cards / grid ===== */
+.grid{display:grid;gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-2{grid-template-columns:1fr 1fr;}
+@media(max-width:1000px){.grid-4{grid-template-columns:repeat(2,1fr);}.grid-2{grid-template-columns:1fr;}}
+
+.card{background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--radius);padding:18px;}
+.stat-card{position:relative;overflow:hidden;}
+.stat-card .label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:600;}
+.stat-card .value{font-family:var(--font-display);font-size:32px;margin-top:6px;font-weight:600;}
+.stat-card .bar{height:3px;border-radius:2px;background:var(--border);margin-top:12px;overflow:hidden;}
+.stat-card .bar i{display:block;height:100%;border-radius:2px;}
+
+.section-title{font-family:var(--font-display);font-size:16px;font-weight:600;margin:26px 0 12px 0;letter-spacing:.2px;display:flex;align-items:center;gap:8px;}
+.section-title:first-child{margin-top:0;}
+
+/* ===== status chips ===== */
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;}
+.chip::before{content:'';width:6px;height:6px;border-radius:50%;}
+.chip.ok{background:var(--success-bg);color:var(--success);}
+.chip.ok::before{background:var(--success);}
+.chip.warn{background:var(--warning-bg);color:var(--warning);}
+.chip.warn::before{background:var(--warning);}
+.chip.bad{background:var(--danger-bg);color:var(--danger);}
+.chip.bad::before{background:var(--danger);}
+.chip.neutral{background:var(--panel-2);color:var(--muted);}
+.chip.neutral::before{background:var(--muted-2);}
+
+/* ===== operational status badges ===== */
+.status-op{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  width:100%;padding:8px 10px;border-radius:8px;
+  font-size:11.5px;font-weight:800;letter-spacing:.25px;
+  text-transform:uppercase;margin-top:4px;border:1px solid transparent;
+}
+.status-op::before{content:'';width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.status-op.em-campo{background:rgba(58,166,107,.16);color:#4dcc83;border-color:rgba(58,166,107,.35);}
+.status-op.em-campo::before{background:#3aa66b;}
+.status-op.estoque{background:rgba(79,124,255,.16);color:#6f96ff;border-color:rgba(79,124,255,.35);}
+.status-op.estoque::before{background:#4f7cff;}
+.status-op.recarga{background:rgba(217,164,65,.16);color:#f0b84f;border-color:rgba(217,164,65,.35);}
+.status-op.recarga::before{background:#d9a441;}
+.status-op.desativado{background:rgba(224,67,42,.16);color:#ff664f;border-color:rgba(224,67,42,.35);}
+.status-op.desativado::before{background:#e0432a;}
+.ext-card.status-em-campo{border-left:4px solid #3aa66b;}
+.ext-card.status-estoque{border-left:4px solid #4f7cff;}
+.ext-card.status-recarga{border-left:4px solid #d9a441;}
+.ext-card.status-desativado{border-left:4px solid #e0432a;}
+
+/* ===== donut chart ===== */
+.donut-wrap{display:flex;align-items:center;gap:22px;flex-wrap:wrap;}
+.donut{width:130px;height:130px;border-radius:50%;flex-shrink:0;position:relative;}
+.donut .hole{position:absolute;inset:16px;background:var(--panel);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;}
+.donut .hole b{font-family:var(--font-display);font-size:22px;}
+.donut .hole span{font-size:10px;color:var(--muted);}
+.legend{display:flex;flex-direction:column;gap:8px;font-size:12.5px;}
+.legend-item{display:flex;align-items:center;gap:8px;}
+.legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+
+/* ===== extinguisher cards ===== */
+.ext-grid{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));}
+.ext-card{background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;transition:.15s;}
+.ext-card:hover{border-color:var(--muted-2);}
+.ext-photo{height:130px;background:var(--panel-2);position:relative;overflow:hidden;}
+.ext-photo img{width:100%;height:100%;object-fit:cover;}
+.ext-photo .no-photo{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted-2);}
+.ext-photo .no-photo svg{width:34px;height:34px;}
+.ext-num{position:absolute;top:8px;left:8px;background:rgba(18,22,27,0.85);border:1px solid var(--border);font-family:var(--font-mono);font-size:11px;padding:2px 7px;border-radius:5px;}
+.ext-body{padding:12px 13px 13px 13px;display:flex;flex-direction:column;gap:6px;flex:1;}
+.ext-body .loc{font-size:13.5px;font-weight:600;}
+.ext-body .meta{font-size:11.5px;color:var(--muted);}
+.ext-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;}
+.ext-actions{display:flex;gap:6px;margin-top:8px;}
+.ext-actions .btn{flex:1;justify-content:center;padding:7px 8px;}
+
+/* hazard stripe accent — signature element */
+.hazard-strip{height:6px;width:100%;background:repeating-linear-gradient(135deg,var(--accent) 0 10px,#1a1204 10px 20px);opacity:.9;}
+
+/* ===== forms ===== */
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;}
+.field label{font-size:12px;color:var(--muted);font-weight:600;}
+.field input[type=text],.field input[type=number],.field input[type=date],.field select,.field textarea{
+  background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 11px;font-size:13.5px;width:100%;
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);}
+.field textarea{resize:vertical;min-height:64px;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:600px){.field-row{grid-template-columns:1fr;}}
+.photo-upload{
+  border:1.5px dashed var(--border);border-radius:10px;height:150px;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:6px;color:var(--muted);cursor:pointer;position:relative;overflow:hidden;background:var(--panel-2);
+}
+.photo-upload img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.photo-upload svg{width:26px;height:26px;}
+.photo-upload span{font-size:12px;}
+.photo-upload input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+
+/* ===== checklist ===== */
+.checklist{display:flex;flex-direction:column;gap:0;border:1px solid var(--border-soft);border-radius:10px;overflow:hidden;}
+.check-row{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--border-soft);gap:10px;}
+.check-row:last-child{border-bottom:none;}
+.check-row .num{font-family:var(--font-mono);color:var(--muted-2);font-size:11px;width:18px;flex-shrink:0;}
+.check-row .label{font-size:13px;flex:1;}
+.seg{display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;flex-shrink:0;}
+.seg button{border:none;background:var(--panel-2);color:var(--muted);font-size:10.5px;font-weight:700;padding:6px 8px;border-right:1px solid var(--border);}
+.seg button:last-child{border-right:none;}
+.seg button.sel[data-v="C"]{background:var(--success);color:#fff;}
+.seg button.sel[data-v="NC"]{background:var(--danger);color:#fff;}
+.seg button.sel[data-v="NA"]{background:var(--muted-2);color:#fff;}
+.seg button.sel[data-v="S.A"]{background:var(--warning);color:#111;}
+
+/* ===== modal ===== */
+.overlay{position:fixed;inset:0;background:rgba(8,10,13,0.72);display:flex;align-items:flex-start;justify-content:center;padding:30px 16px;z-index:100;overflow-y:auto;}
+.modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;width:100%;max-width:620px;margin:auto;}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border-soft);}
+.modal-head h3{font-family:var(--font-display);font-size:17px;margin:0;}
+.modal-body{padding:20px 22px;max-height:70vh;overflow-y:auto;}
+.modal-foot{padding:16px 22px;border-top:1px solid var(--border-soft);display:flex;justify-content:flex-end;gap:8px;}
+.icon-btn{background:none;border:none;color:var(--muted);padding:4px;border-radius:6px;}
+.icon-btn:hover{background:var(--panel-2);color:var(--text);}
+.icon-btn svg{width:18px;height:18px;display:block;}
+
+/* ===== table ===== */
+.table-wrap{overflow-x:auto;border:1px solid var(--border-soft);border-radius:10px;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:900px;}
+th{text-align:left;padding:10px 12px;background:var(--panel-2);color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;border-bottom:1px solid var(--border);}
+td{padding:9px 12px;border-bottom:1px solid var(--border-soft);white-space:nowrap;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--panel-2);}
+
+/* ===== filters ===== */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center;}
+.filters select,.filters input{background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:12.5px;}
+.search-box{position:relative;flex:1;min-width:180px;}
+.search-box svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--muted-2);}
+.search-box input{width:100%;padding-left:32px;}
+
+/* ===== empty state ===== */
+.empty{text-align:center;padding:60px 20px;color:var(--muted);}
+.empty svg{width:44px;height:44px;color:var(--muted-2);margin-bottom:10px;}
+.empty h4{font-family:var(--font-display);color:var(--text);font-size:16px;margin:8px 0 4px 0;}
+.empty p{font-size:13px;margin:0;}
+
+/* ===== QR / scanner ===== */
+.qr-box{background:#fff;border-radius:10px;padding:10px;display:inline-flex;align-items:center;justify-content:center;}
+.qr-label-preview{
+  background:#fff;color:#111;border-radius:8px;padding:12px;width:180px;text-align:center;border:3px solid var(--accent);
+}
+.qr-label-preview .top-stripe{height:5px;background:repeating-linear-gradient(135deg,#e0432a 0 8px,#111 8px 16px);margin:-12px -12px 10px -12px;border-radius:6px 6px 0 0;}
+.qr-label-preview b{font-family:var(--font-mono);font-size:13px;display:block;margin-top:6px;}
+.qr-label-preview .company{font-size:9px;color:#555;margin-top:2px;}
+
+.scanner-wrap{position:relative;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:1/1;max-width:360px;margin:0 auto;}
+.scanner-wrap video{width:100%;height:100%;object-fit:cover;}
+.scan-frame{position:absolute;inset:14%;border:2.5px solid var(--accent);border-radius:14px;box-shadow:0 0 0 999px rgba(0,0,0,0.35);}
+.scan-hint{text-align:center;font-size:12.5px;color:var(--muted);margin-top:12px;}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--border);
+  padding:11px 18px;border-radius:9px;font-size:13px;z-index:300;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,0.4);}
+.toast.ok{border-color:var(--success);}
+.toast.err{border-color:var(--danger);}
+
+.print-only{display:none;}
+@media print{
+  body *{visibility:hidden;}
+  #print-area, #print-area *{visibility:visible;}
+  #print-area{position:absolute;top:0;left:0;width:100%;}
+  .print-only{display:block;}
+}
+
+@media(max-width:860px){
+  .sidebar{display:none;}
+  .content{padding:16px 14px 90px 14px;}
+  .topbar{padding:14px 16px;}
+  .bottom-nav{
+    display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--border-soft);
+    z-index:50;padding:6px 4px calc(env(safe-area-inset-bottom) + 6px) 4px;
+  }
+  .bottom-nav button{flex:1;background:none;border:none;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;font-size:9.5px;font-weight:600;}
+  .bottom-nav button svg{width:19px;height:19px;}
+  .bottom-nav button.active{color:var(--accent);}
+  .grid-4{grid-template-columns:repeat(2,1fr);}
+}
+
+@media(max-width:760px){
+  .history-layout{grid-template-columns:1fr!important;}
+  .history-summary{grid-template-columns:1fr!important;}
+}
+
+
+/* ===== ficha completa do extintor ===== */
+.ext-full-modal{width:min(1240px,96vw);max-height:94vh;}
+.ext-full-head{padding:18px 22px;}
+.ext-detail-tabs{
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  padding:0 0 14px;border-bottom:1px solid var(--border);margin-bottom:16px;
+}
+.ext-tab{
+  display:inline-flex;align-items:center;gap:8px;
+  background:transparent;border:0;color:var(--muted);
+  padding:10px 12px;border-radius:8px;font-weight:700;cursor:pointer;
+}
+.ext-tab:hover{background:var(--panel-2);color:var(--text);}
+.ext-tab.active{color:var(--text);border-bottom:2px solid var(--accent);border-radius:0;}
+.ext-detail-grid{display:grid;grid-template-columns:320px 1fr;gap:16px;}
+.ext-side-column{display:flex;flex-direction:column;gap:12px;}
+.ext-summary-card,.ext-resume-card,.ext-tip-card,.ext-history-panel{padding:16px;}
+.ext-photo-box{
+  width:96px;height:150px;border-radius:10px;overflow:hidden;
+  background:var(--panel-2);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.ext-photo-box img{width:100%;height:100%;object-fit:cover;}
+.ext-photo-placeholder{font-size:11px;color:var(--muted);text-align:center;font-weight:700;}
+.ext-small-label{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.35px;}
+.ext-main-value{font-size:17px;font-weight:800;font-family:var(--font-mono);margin-top:2px;}
+.ext-main-text{font-size:12.5px;line-height:1.5;margin-top:3px;}
+.ext-date-block{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px;
+  padding-top:14px;border-top:1px solid var(--border);
+}
+.ext-date-value{font-size:15px;font-weight:800;margin-top:3px;}
+.ext-resume-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.ext-resume-box{
+  background:var(--panel-2);border:1px solid var(--border);
+  border-radius:10px;padding:12px;display:flex;gap:10px;align-items:center;
+}
+.ext-resume-icon{
+  width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-weight:900;font-size:18px;
+}
+.ext-resume-icon.ok{background:rgba(58,166,107,.18);color:var(--ok);}
+.ext-resume-icon.warn{background:rgba(217,164,65,.18);color:var(--warn);}
+.ext-resume-number{font-size:20px;font-weight:800;line-height:1;}
+.ext-resume-label{font-size:11px;color:var(--muted);margin-top:3px;}
+.ext-resume-percent{font-size:11px;font-weight:700;margin-top:2px;}
+.ext-tip-card{border-color:rgba(217,164,65,.35);}
+.ext-history-panel{min-width:0;}
+.ext-history-header{
+  display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
+  padding-bottom:14px;border-bottom:1px solid var(--border);
+}
+.ext-empty-history{padding:40px;text-align:center;color:var(--muted);}
+.ext-timeline{position:relative;}
+.ext-history-row{
+  position:relative;display:grid;
+  grid-template-columns:120px minmax(190px,1fr) 140px auto;
+  gap:14px;align-items:center;padding:16px 10px 16px 28px;
+  border-bottom:1px solid var(--border);
+}
+.ext-history-row:last-child{border-bottom:0;}
+.ext-history-row:before{
+  content:'';position:absolute;left:11px;top:0;bottom:0;width:2px;background:var(--border);
+}
+.ext-timeline-marker{
+  position:absolute;left:5px;top:50%;transform:translateY(-50%);
+  width:14px;height:14px;border-radius:50%;border:3px solid var(--panel);
+  z-index:2;
+}
+.ext-timeline-marker.ok{background:var(--ok);}
+.ext-timeline-marker.bad{background:var(--bad);}
+.ext-history-date-main{font-size:16px;font-weight:800;}
+.ext-history-date-sub,.ext-history-note{font-size:11.5px;color:var(--muted);margin-top:4px;}
+.ext-history-actions{display:flex;justify-content:flex-end;gap:7px;flex-wrap:wrap;}
+.btn-primary{background:rgba(47,116,255,.16);border-color:rgba(47,116,255,.35);color:#79a7ff;}
+@media(max-width:980px){
+  .ext-detail-grid{grid-template-columns:1fr;}
+  .ext-side-column{display:grid;grid-template-columns:1fr 1fr;}
+  .ext-tip-card{grid-column:1/-1;}
+}
+@media(max-width:760px){
+  .ext-side-column{display:flex;}
+  .ext-history-row{
+    grid-template-columns:1fr;
+    gap:8px;padding:16px 10px 16px 30px;
+  }
+  .ext-history-actions{justify-content:flex-start;}
+  .ext-history-responsible{display:none;}
+  .ext-date-block,.ext-resume-grid{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:520px){
+  .ext-date-block,.ext-resume-grid{grid-template-columns:1fr;}
+  .ext-photo-box{width:82px;height:125px;}
+}
+
+
+/* ===== visualização moderna da inspeção ===== */
+.inspection-view-modal{width:min(900px,96vw);}
+.inspection-result-banner{
+  display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:12px;
+  border:1px solid transparent;margin-bottom:16px;
+}
+.inspection-result-banner.ok{
+  background:rgba(58,166,107,.14);border-color:rgba(58,166,107,.35);
+}
+.inspection-result-banner.bad{
+  background:rgba(224,67,42,.14);border-color:rgba(224,67,42,.35);
+}
+.inspection-result-dot{
+  width:14px;height:14px;border-radius:50%;flex-shrink:0;
+}
+.inspection-result-banner.ok .inspection-result-dot{background:var(--ok);}
+.inspection-result-banner.bad .inspection-result-dot{background:var(--bad);}
+.inspection-result-title{font-size:17px;font-weight:900;letter-spacing:.3px;}
+.inspection-result-banner.ok .inspection-result-title{color:var(--ok);}
+.inspection-result-banner.bad .inspection-result-title{color:var(--bad);}
+.inspection-result-sub{font-size:12px;color:var(--muted);margin-top:3px;}
+
+.inspection-summary-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:10px;
+}
+.inspection-summary-card{padding:13px;min-width:0;}
+.inspection-summary-label{
+  font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.35px;
+}
+.inspection-summary-value{font-size:14px;font-weight:800;margin-top:6px;word-break:break-word;}
+.inspection-summary-sub{font-size:11.5px;color:var(--muted);margin-top:3px;}
+
+.inspection-count-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px;
+}
+.inspection-count-box{
+  padding:13px;border-radius:10px;border:1px solid var(--border);background:var(--panel-2);
+}
+.inspection-count-box.ok{border-color:rgba(58,166,107,.28);}
+.inspection-count-box.bad{border-color:rgba(224,67,42,.28);}
+.inspection-count-box.neutral{border-color:rgba(145,155,170,.24);}
+.inspection-count-number{font-size:22px;font-weight:900;}
+.inspection-count-box.ok .inspection-count-number{color:var(--ok);}
+.inspection-count-box.bad .inspection-count-number{color:var(--bad);}
+.inspection-count-label{font-size:11.5px;color:var(--muted);margin-top:2px;}
+
+.inspection-items-list{
+  border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel);
+}
+.inspection-item-row{
+  display:grid;grid-template-columns:42px 1fr auto;gap:12px;align-items:center;
+  padding:12px 14px;border-bottom:1px solid var(--border);
+}
+.inspection-item-row:last-child{border-bottom:0;}
+.inspection-item-number{
+  width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:var(--panel-2);border:1px solid var(--border);font-weight:800;font-size:12px;
+}
+.inspection-item-text{font-size:13px;line-height:1.35;}
+.inspection-item-status{
+  min-width:110px;text-align:center;border-radius:999px;padding:6px 10px;
+  font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.25px;
+}
+.inspection-item-status.ok{background:rgba(58,166,107,.15);color:var(--ok);}
+.inspection-item-status.bad{background:rgba(224,67,42,.15);color:var(--bad);}
+.inspection-item-status.neutral{background:var(--panel-2);color:var(--muted);}
+.inspection-observation{padding:14px;min-height:54px;line-height:1.5;}
+
+@media(max-width:760px){
+  .inspection-summary-grid{grid-template-columns:1fr 1fr;}
+  .inspection-count-grid{grid-template-columns:1fr;}
+  .inspection-item-row{grid-template-columns:36px 1fr;}
+  .inspection-item-status{grid-column:2;justify-self:start;min-width:0;}
+}
+@media(max-width:520px){
+  .inspection-summary-grid{grid-template-columns:1fr;}
+}
+
+
+/* ===== dashboard interativo Chart.js ===== */
+.dashboard-charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
+.chart-card{padding:16px;min-width:0;}
+.chart-card-wide{grid-column:1/-1;}
+.chart-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px;}
+.chart-title{font-family:var(--font-display);font-size:16px;font-weight:600;}
+.chart-sub{font-size:11.5px;color:var(--muted);margin-top:3px;}
+.chart-wrap{position:relative;height:290px;}
+.chart-wrap.small{height:250px;}
+.dashboard-filter-note{
+  padding:9px 12px;border:1px solid var(--border-soft);border-radius:8px;
+  background:var(--panel-2);font-size:11.5px;color:var(--muted);margin-top:12px;
+}
+@media(max-width:900px){
+  .dashboard-charts{grid-template-columns:1fr;}
+  .chart-card-wide{grid-column:auto;}
+}
+@media(max-width:560px){
+  .chart-wrap,.chart-wrap.small{height:240px;}
+}
+
+
+/* ===== Relatórios — interface moderna sem ícones gigantes ===== */
+.reports-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr);
+  gap:18px;
+  align-items:start;
+}
+.report-card{
+  background:linear-gradient(180deg,rgba(31,39,48,.98),rgba(27,33,40,.98));
+  border:1px solid var(--border-soft);
+  border-radius:14px;
+  padding:22px;
+}
+.report-card-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  padding-bottom:17px;
+  border-bottom:1px solid var(--border-soft);
+  margin-bottom:18px;
+}
+.report-card-title{
+  font-family:var(--font-display);
+  font-size:20px;
+  font-weight:600;
+  margin:0;
+}
+.report-card-desc{
+  font-size:12.5px;
+  color:var(--muted);
+  line-height:1.55;
+  margin-top:5px;
+  max-width:620px;
+}
+.report-info{
+  border:1px solid rgba(79,124,255,.30);
+  background:rgba(79,124,255,.08);
+  border-radius:10px;
+  padding:11px 13px;
+  font-size:12px;
+  line-height:1.5;
+  color:#b9c6d6;
+  margin-bottom:16px;
+}
+.report-info.success{
+  border-color:rgba(58,166,107,.30);
+  background:rgba(58,166,107,.08);
+}
+.report-actions{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-top:4px;
+}
+.report-actions .btn{
+  min-height:42px;
+}
+.report-primary{
+  width:100%;
+  justify-content:center;
+}
+.report-side{
+  display:grid;
+  gap:18px;
+}
+.report-qr-card .report-actions{
+  margin-top:18px;
+}
+.report-tips{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:12px;
+  margin-top:18px;
+}
+.report-tip{
+  background:var(--panel);
+  border:1px solid var(--border-soft);
+  border-radius:12px;
+  padding:16px;
+  min-height:132px;
+}
+.report-tip-title{
+  font-family:var(--font-display);
+  font-size:14px;
+  font-weight:600;
+  margin-bottom:7px;
+}
+.report-tip-text{
+  font-size:11.5px;
+  line-height:1.55;
+  color:var(--muted);
+}
+.report-foot-note{
+  margin-top:12px;
+  font-size:11px;
+  color:var(--muted-2);
+  text-align:center;
+}
+@media(max-width:1050px){
+  .reports-layout{grid-template-columns:1fr;}
+  .report-tips{grid-template-columns:repeat(2,1fr);}
+}
+@media(max-width:620px){
+  .report-card{padding:16px;}
+  .report-tips{grid-template-columns:1fr;}
+  .report-card-head{margin-bottom:14px;}
+  .report-actions{flex-direction:column;}
+  .report-actions .btn{width:100%;justify-content:center;}
+}
+
+
+/* ===== Inspecionar — interface moderna sem ícones gigantes ===== */
+.inspect-layout{
+  display:grid;
+  grid-template-columns:minmax(340px,.92fr) minmax(420px,1.08fr);
+  gap:18px;
+  align-items:start;
+}
+.inspect-card{
+  background:linear-gradient(180deg,rgba(31,39,48,.98),rgba(27,33,40,.98));
+  border:1px solid var(--border-soft);
+  border-radius:14px;
+  padding:22px;
+  min-width:0;
+}
+.inspect-card-head{
+  padding-bottom:16px;
+  border-bottom:1px solid var(--border-soft);
+  margin-bottom:18px;
+}
+.inspect-card-title{
+  font-family:var(--font-display);
+  font-size:20px;
+  font-weight:600;
+  margin:0;
+}
+.inspect-card-desc{
+  font-size:12.5px;
+  line-height:1.55;
+  color:var(--muted);
+  margin-top:5px;
+}
+.inspect-scanner-shell{
+  border:1px solid var(--border);
+  background:#0d1116;
+  border-radius:12px;
+  padding:12px;
+}
+.inspect-scanner-shell .scanner-wrap{
+  max-width:none;
+  width:100%;
+  aspect-ratio:4/3;
+}
+.inspect-scanner-shell .scan-frame{
+  inset:12%;
+  border-width:2px;
+}
+.inspect-note{
+  margin-top:12px;
+  padding:10px 12px;
+  border-radius:9px;
+  border:1px solid rgba(224,67,42,.25);
+  background:rgba(224,67,42,.07);
+  color:#bbc3cc;
+  font-size:11.5px;
+  line-height:1.5;
+}
+.inspect-actions{
+  margin-top:12px;
+  display:grid;
+  gap:9px;
+}
+.inspect-actions .btn{
+  width:100%;
+  min-height:42px;
+  justify-content:center;
+}
+.inspect-divider{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  color:var(--muted-2);
+  font-size:11px;
+  margin:2px 0;
+}
+.inspect-divider::before,
+.inspect-divider::after{
+  content:'';
+  height:1px;
+  background:var(--border-soft);
+  flex:1;
+}
+.manual-search-wrap{
+  margin-bottom:12px;
+}
+.manual-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  max-height:500px;
+  overflow-y:auto;
+  padding-right:3px;
+}
+.manual-ext-row{
+  width:100%;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:14px;
+  align-items:center;
+  text-align:left;
+  padding:13px 14px;
+  border:1px solid var(--border-soft);
+  border-radius:10px;
+  background:var(--panel-2);
+  color:var(--text);
+  transition:.15s;
+}
+.manual-ext-row:hover{
+  border-color:var(--muted-2);
+  transform:translateY(-1px);
+}
+.manual-ext-main{min-width:0;}
+.manual-ext-number{
+  font-family:var(--font-mono);
+  color:var(--accent);
+  font-size:12px;
+  font-weight:700;
+}
+.manual-ext-usina{
+  font-size:13px;
+  font-weight:700;
+  margin-top:3px;
+}
+.manual-ext-local{
+  font-size:11.5px;
+  color:var(--muted);
+  margin-top:3px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.manual-ext-side{
+  display:flex;
+  align-items:flex-end;
+  flex-direction:column;
+  gap:7px;
+}
+.manual-ext-meta{
+  font-size:10.5px;
+  color:var(--muted);
+  white-space:nowrap;
+}
+.manual-ext-status{
+  display:inline-flex;
+  align-items:center;
+  padding:4px 8px;
+  border-radius:999px;
+  font-size:9.5px;
+  font-weight:800;
+  letter-spacing:.2px;
+  white-space:nowrap;
+}
+.manual-ext-status.em-campo{background:rgba(58,166,107,.15);color:#4dcc83;}
+.manual-ext-status.estoque{background:rgba(79,124,255,.15);color:#7b9cff;}
+.manual-ext-status.recarga{background:rgba(217,164,65,.15);color:#e6b34f;}
+.manual-ext-status.desativado{background:rgba(224,67,42,.15);color:#ff6a52;}
+.inspect-help{
+  margin-top:18px;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+}
+.inspect-help-item{
+  background:var(--panel);
+  border:1px solid var(--border-soft);
+  border-radius:12px;
+  padding:16px;
+}
+.inspect-help-step{
+  font-family:var(--font-mono);
+  color:var(--accent);
+  font-size:11px;
+  font-weight:700;
+}
+.inspect-help-title{
+  font-family:var(--font-display);
+  font-size:14px;
+  font-weight:600;
+  margin-top:6px;
+}
+.inspect-help-text{
+  color:var(--muted);
+  font-size:11.5px;
+  line-height:1.55;
+  margin-top:5px;
+}
+@media(max-width:1050px){
+  .inspect-layout{grid-template-columns:1fr;}
+}
+@media(max-width:700px){
+  .inspect-card{padding:16px;}
+  .inspect-help{grid-template-columns:1fr;}
+  .manual-ext-row{grid-template-columns:1fr;}
+  .manual-ext-side{align-items:flex-start;}
+  .inspect-scanner-shell .scanner-wrap{aspect-ratio:1/1;}
+}
+
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+<div id="print-area"></div>
+
+<script>
+/* ============================================================
+   ESTADO GLOBAL
+============================================================ */
+const ICONS = {
+  dashboard:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>`,
+  ext:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6v3H9z"/><path d="M10 6h4l1 2h2v2H7V8h2z"/><path d="M8 10h8l-1 11H9z"/></svg>`,
+  scan:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8V5a1 1 0 0 1 1-1h3M20 8V5a1 1 0 0 0-1-1h-3M4 16v3a1 1 0 0 0 1 1h3M20 16v3a1 1 0 0 1-1 1h-3"/><line x1="4" y1="12" x2="20" y2="12"/></svg>`,
+  report:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>`,
+  settings:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  plus:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  photo:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="15" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M21 17l-5-5-4 4-2-2-5 5"/></svg>`,
+  edit:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`,
+  trash:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>`,
+  qr:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="14" y1="14" x2="14" y2="21"/><line x1="21" y1="14" x2="21" y2="21"/><line x1="14" y1="17.5" x2="21" y2="17.5"/></svg>`,
+  close:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  search:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+  fire:`<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3-2 4-2 7a3 3 0 0 0 6 0c0-1-.3-1.8-.8-2.6 1.7 1.2 2.8 3.2 2.8 5.6a6 6 0 1 1-12 0c0-4 3-5.4 3-8.5C9 3.5 10 2.7 12 2z"/></svg>`,
+  history:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>`,
+  camera:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
+  download:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  printer:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`,
+  upload:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`,
+};
+
+const CHECK_ITEMS = [
+  "Placa de sinalização",
+  "Área demarcada/sinalizada",
+  "Etiqueta de inspeção",
+  "Difusor/pistola",
+  "Rodas/suporte/tripé",
+  "Mangueiras",
+  "Área/acesso desobstruídos",
+  "Lacre do extintor",
+  "Trava",
+  "Anel de identificação de manutenção",
+  "Base de concreto",
+];
+
+const DEFAULT_USINAS = ["UTE Monte Cristo/Sucuba","UTE Floresta","UTE Distrito"];
+const DEFAULT_AGENTS = ["Pó BC","Pó ABC","CO2","LGE","Água"];
+
+let STATE = {
+  config: { companyName:"Minha Empresa", logo:null, usinas:[...DEFAULT_USINAS], agents:[...DEFAULT_AGENTS], alertDays:30 },
+  extinguishers: [],
+  inspections: [],
+  view: "dashboard",
+  loaded: false,
+};
+
+/* ============================================================
+   STORAGE — FIREBASE FIRESTORE POR DOCUMENTO + CACHE LOCAL
+   Estrutura nova:
+     settings/main
+     extinguishers/{id}
+     inspections/{id}
+
+   Compatibilidade:
+   - Lê o formato antigo em appData/* na primeira migração.
+   - Mantém localStorage como cache/contingência.
+============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyDWQ2s-VXRb6E3S4G5PvNwt0n5rcTtxOy4",
+  authDomain: "controleextintores-ffd13.firebaseapp.com",
+  projectId: "controleextintores-ffd13",
+  storageBucket: "controleextintores-ffd13.firebasestorage.app",
+  messagingSenderId: "835410897748",
+  appId: "1:835410897748:web:30f618d9c1501ee79336c1",
+  measurementId: "G-5DQC2PBW4L"
+};
+
+let FIREBASE_DB = null;
+let FIREBASE_AUTH = null;
+let FIREBASE_READY = false;
+let AUTH_USER = null;
+
+async function initFirebase(){
+  try{
+    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js");
+    const { getFirestore } = await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js");
+    const { getAuth } = await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js");
+
+    const app = initializeApp(firebaseConfig);
+    FIREBASE_DB = getFirestore(app);
+    FIREBASE_AUTH = getAuth(app);
+    FIREBASE_READY = true;
+    return true;
+  }catch(e){
+    console.error("Firebase init error", e);
+    FIREBASE_READY = false;
+    return false;
+  }
+}
+
+function loadLocalKey(key, fallback){
+  try{
+    const raw = localStorage.getItem('extintores:'+key);
+    return raw ? JSON.parse(raw) : fallback;
+  }catch(e){
+    return fallback;
+  }
+}
+
+function saveLocalKey(key, val){
+  try{
+    localStorage.setItem('extintores:'+key, JSON.stringify(val));
+  }catch(e){
+    console.error("local cache save error", e);
+  }
+}
+
+async function readLegacyAppData(key, fallback){
+  if(!FIREBASE_READY || !FIREBASE_DB) return fallback;
+  try{
+    const { doc, getDoc } =
+      await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js");
+    const snap = await getDoc(doc(FIREBASE_DB, "appData", key));
+    return snap.exists() ? (snap.data().value ?? fallback) : fallback;
+  }catch(e){
+    console.error("Legacy read error", key, e);
+    return fallback;
+  }
+}
+
+async function loadConfig(){
+  const localConfig = loadLocalKey('config', STATE.config);
+  if(!FIREBASE_READY || !FIREBASE_DB) return localConfig;
+
+  try{
+    const { doc, getDoc, setDoc, serverTimestamp } =
+      await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js");
+
+    const ref = doc(FIREBASE_DB, "settings", "main");
+    const snap = await getDoc(ref);
+
+    if(snap.exists()){
+      const data = snap.data();
+      const config = data.value || data.config || localConfig;
+      saveLocalKey('config', config);
+      return config;
+    }
+
+    // Migra configuração antiga, se existir.
+    const legacy = await readLegacyAppData('config', localConfig);
+    await setDoc(ref, { value: legacy, updatedAt: serverTimestamp() }, { merge: true });
+    saveLocalKey('config', legacy);
+    return legacy;
+  }catch(e){
+    console.error("Config load error", e);
+    return localConfig;
+  }
+}
+
+async function loadCollectionData(collectionName, localKey){
+  const localValue = loadLocalKey(localKey, []);
+  if(!FIREBASE_READY || !FIREBASE_DB) return localValue;
+
+  try{
+    const { collection, getDocs, doc, setDoc, serverTimestamp } =
+      await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js");
+
+    const snap = await getDocs(collection(FIREBASE_DB, collectionName));
+    if(!snap.empty){
+      const items = snap.docs.map(d => ({ ...d.data(), id: d.data().id || d.id }));
+      saveLocalKey(localKey, items);
+      return items;
+    }
+
+    // Coleção nova vazia: tenta migrar o array antigo de appData.
+    const legacy = await readLegacyAppData(localKey, localValue);
+    if(Array.isArray(legacy) && legacy.length){
+      for(const item of legacy){
+        if(!item || !item.id) continue;
+        await setDoc(
+          doc(FIREBASE_DB, collectionName, String(item.id)),
+          { ...item, migratedAt: serverTimestamp() },
+          { merge: true }
+        );
+      }
+      saveLocalKey(localKey, legacy);
+      return legacy;
+    }
+
+    return localValue;
+  }catch(e){
+    console.error("Collection load error", collectionName, e);
+    return localValue;
+  }
+}
+
+async function syncCollectionData(collectionName, localKey, items){
+  saveLocalKey(localKey, items);
+
+  if(!FIREBASE_READY || !FIREBASE_DB){
+    console.warn("Firebase indisponível; dados mantidos apenas no cache local.");
+    return;
+  }
+
+  try{
+    const { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp } =
+      await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js");
+
+    const colRef = collection(FIREBASE_DB, collectionName);
+    const existingSnap = await getDocs(colRef);
+    const currentIds = new Set(
+      items.filter(item => item && item.id).map(item => String(item.id))
+    );
+
+    // Salva/atualiza cada registro em seu próprio documento.
+    for(const item of items){
+      if(!item || !item.id) continue;
+      await setDoc(
+        doc(FIREBASE_DB, collectionName, String(item.id)),
+        { ...item, updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+    }
+
+    // Remove da nuvem documentos que foram excluídos no sistema.
+    for(const existing of existingSnap.docs){
+      if(!currentIds.has(existing.id)){
+        await deleteDoc(existing.ref);
+      }
+    }
+  }catch(e){
+    console.error("Collection sync error", collectionName, e);
+    showToast("Dados salvos no dispositivo, mas a sincronização com a nuvem falhou.","err");
+  }
+}
+
+async function loadAll(){
+  const [config, extinguishers, inspections] = await Promise.all([
+    loadConfig(),
+    loadCollectionData('extinguishers', 'extinguishers'),
+    loadCollectionData('inspections', 'inspections'),
+  ]);
+
+  STATE.config = Object.assign(STATE.config, config);
+  STATE.extinguishers = Array.isArray(extinguishers) ? extinguishers : [];
+  STATE.inspections = Array.isArray(inspections) ? inspections : [];
+
+  // Migração de dados antigos: campo "setor"/"sectors" -> "usina"/"usinas"
+  let migrated = false;
+  if(!STATE.config.usinas && Array.isArray(STATE.config.sectors)){
+    STATE.config.usinas = STATE.config.sectors;
+    delete STATE.config.sectors;
+    migrated = true;
+  }
+  if(!STATE.config.usinas || STATE.config.usinas.length===0){
+    STATE.config.usinas = [...DEFAULT_USINAS];
+    migrated = true;
+  }
+  const renameIdx = STATE.config.usinas.indexOf("UTE Monte Cristo");
+  if(renameIdx>-1){
+    STATE.config.usinas[renameIdx] = "UTE Monte Cristo/Sucuba";
+    migrated = true;
+  }
+  STATE.extinguishers.forEach(e=>{
+    if(e.usina===undefined && e.setor!==undefined){
+      e.usina = e.setor;
+      delete e.setor;
+      migrated = true;
+    }
+    if(e.usina==="UTE Monte Cristo"){
+      e.usina = "UTE Monte Cristo/Sucuba";
+      migrated = true;
+    }
+  });
+
+  if(migrated){
+    await persistConfig();
+    await persistExtinguishers();
+  }
+
+  STATE.loaded = true;
+}
+
+async function persistConfig(){
+  saveLocalKey('config', STATE.config);
+
+  if(!FIREBASE_READY || !FIREBASE_DB) return;
+
+  try{
+    const { doc, setDoc, serverTimestamp } =
+      await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js");
+
+    await setDoc(
+      doc(FIREBASE_DB, "settings", "main"),
+      { value: STATE.config, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+  }catch(e){
+    console.error("Config save error", e);
+    showToast("Configuração salva localmente, mas a nuvem não foi atualizada.","err");
+  }
+}
+
+async function persistExtinguishers(){
+  await syncCollectionData('extinguishers', 'extinguishers', STATE.extinguishers);
+}
+
+async function persistInspections(){
+  await syncCollectionData('inspections', 'inspections', STATE.inspections);
+}
+
+/* ============================================================
+   HELPERS
+============================================================ */
+function uid(prefix){ return prefix+"-"+Math.random().toString(36).slice(2,9).toUpperCase(); }
+function fmtDate(d){ if(!d) return "—"; const dt=new Date(d+"T00:00:00"); if(isNaN(dt)) return "—"; return dt.toLocaleDateString('pt-BR'); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function daysUntil(dateStr){
+  if(!dateStr) return null;
+  const target = new Date(dateStr+"T00:00:00");
+  const now = new Date(); now.setHours(0,0,0,0);
+  return Math.round((target-now)/86400000);
+}
+function dateStatus(dateStr, allowAlert=true){
+  const d = daysUntil(dateStr);
+  if(d===null) return {label:"—", cls:"neutral", days:null};
+  if(d<0) return {label:"VENCIDO", cls:"bad", days:d};
+  if(allowAlert && d<=STATE.config.alertDays) return {label:"ALERTA", cls:"warn", days:d};
+  return {label:"VÁLIDO", cls:"ok", days:d};
+}
+function lastInspection(extId){
+  const list = STATE.inspections.filter(i=>i.extinguisherId===extId).sort((a,b)=> b.date.localeCompare(a.date));
+  return list[0] || null;
+}
+
+function extinguisherDirectUrl(extId){
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("ext", extId);
+  return url.toString();
+}
+
+function extinguisherIdFromQrData(data){
+  if(!data) return null;
+  const raw = String(data).trim();
+
+  // Compatibilidade com etiquetas antigas que guardavam somente o ID.
+  if(STATE.extinguishers.some(e=>e.id===raw)) return raw;
+
+  try{
+    const url = new URL(raw);
+    return url.searchParams.get("ext");
+  }catch(e){
+    return null;
+  }
+}
+
+function openRequestedExtinguisherFromUrl(){
+  const params = new URLSearchParams(window.location.search);
+  const extId = params.get("ext");
+  if(!extId) return;
+
+  const ext = STATE.extinguishers.find(e=>e.id===extId);
+  if(ext){
+    setTimeout(()=>openQuickInspectionPanel(ext.id), 80);
+  }else{
+    setTimeout(()=>showToast("Extintor do QR Code não encontrado.","err"), 100);
+  }
+
+  // Limpa o parâmetro para a ficha não reabrir a cada atualização.
+  const cleanUrl = new URL(window.location.href);
+  cleanUrl.searchParams.delete("ext");
+  history.replaceState({}, "", cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+}
+function escapeHtml(s){ s = (s===null||s===undefined) ? "" : String(s); return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function showToast(msg, type="ok"){
+  const root = document.getElementById('toast-root');
+  const el = document.createElement('div');
+  el.className = "toast "+type;
+  el.textContent = msg;
+  root.appendChild(el);
+  setTimeout(()=>{ el.style.opacity="0"; el.style.transition="opacity .3s"; setTimeout(()=>el.remove(),300); }, 2600);
+}
+function fileToDataUrl(file, maxDim=900){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let {width,height} = img;
+        if(width>maxDim || height>maxDim){
+          if(width>height){ height = Math.round(height*maxDim/width); width = maxDim; }
+          else{ width = Math.round(width*maxDim/height); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width=width; canvas.height=height;
+        canvas.getContext('2d').drawImage(img,0,0,width,height);
+        resolve(canvas.toDataURL('image/jpeg', 0.78));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ============================================================
+   RENDER SHELL
+============================================================ */
+const NAV_ITEMS = [
+  {id:'dashboard', label:'Painel', icon:'dashboard'},
+  {id:'extinguishers', label:'Extintores', icon:'ext'},
+  {id:'inspect', label:'Inspecionar', icon:'scan'},
+  {id:'reports', label:'Relatórios', icon:'report'},
+  {id:'settings', label:'Configurações', icon:'settings'},
+];
+
+function renderShell(){
+  const app = document.getElementById('app');
+  const cfg = STATE.config;
+  app.innerHTML = `
+    <div class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">${cfg.logo ? `<img src="${cfg.logo}">` : ICONS.fire}</div>
+        <div class="brand-text"><b>${escapeHtml(cfg.companyName)}</b><span>Controle de Extintores</span></div>
+      </div>
+      <div class="nav">
+        ${NAV_ITEMS.map(n=>`<button class="nav-item ${STATE.view===n.id?'active':''}" data-nav="${n.id}">${ICONS[n.icon]}<span>${n.label}</span></button>`).join('')}
+      </div>
+      <div class="sidebar-foot">
+        <div>Dados sincronizados por registro.<br>Cache local de segurança · 2026</div>
+        <button class="btn btn-sm" id="btn-logout" style="width:100%;justify-content:center;margin-top:10px;">Sair</button>
+      </div>
+    </div>
+    <div class="main">
+      <div class="topbar">
+        <div>
+          <h1 id="page-title"></h1>
+          <div class="sub" id="page-sub"></div>
+        </div>
+        <div id="topbar-actions"></div>
+      </div>
+      <div class="content" id="content"></div>
+    </div>
+    <div class="bottom-nav">
+      ${NAV_ITEMS.map(n=>`<button class="${STATE.view===n.id?'active':''}" data-nav="${n.id}">${ICONS[n.icon]}<span>${n.label}</span></button>`).join('')}
+    </div>
+  `;
+  app.querySelectorAll('[data-nav]').forEach(b=>b.addEventListener('click', ()=>{ STATE.view=b.dataset.nav; renderShell(); }));
+  document.getElementById('btn-logout')?.addEventListener('click', logout);
+  renderView();
+}
+
+function setHeader(title, sub, actionsHtml=""){
+  document.getElementById('page-title').textContent = title;
+  document.getElementById('page-sub').textContent = sub;
+  document.getElementById('topbar-actions').innerHTML = actionsHtml;
+}
+
+function renderView(){
+  if(STATE.view==='dashboard') return renderDashboard();
+  if(STATE.view==='extinguishers') return renderExtinguishers();
+  if(STATE.view==='inspect') return renderInspect();
+  if(STATE.view==='reports') return renderReports();
+  if(STATE.view==='settings') return renderSettings();
+}
+
+/* ============================================================
+   DASHBOARD
+============================================================ */
+let DASHBOARD_CHARTS = [];
+
+function destroyDashboardCharts(){
+  DASHBOARD_CHARTS.forEach(chart=>{
+    try{ chart.destroy(); }catch(e){}
+  });
+  DASHBOARD_CHARTS = [];
+}
+
+function renderDashboard(){
+  destroyDashboardCharts();
+  setHeader("Painel geral","Indicadores e gráficos atualizados com os dados do Firebase");
+  const ext = STATE.extinguishers;
+  const content = document.getElementById('content');
+
+  if(ext.length===0){
+    content.innerHTML = emptyState("dashboard", "Nenhum extintor cadastrado ainda", "Cadastre o primeiro extintor para começar a acompanhar vencimentos e inspeções.", "Cadastrar extintor");
+    document.getElementById('empty-cta')?.addEventListener('click', ()=>openExtinguisherModal());
+    return;
+  }
+
+  const recStatus = ext.map(e=>dateStatus(e.dataRecarga).label);
+  const thStatus = ext.map(e=>dateStatus(e.dataTH,false).label);
+  const nc = ext.filter(e=>{ const li=lastInspection(e.id); return li && li.resultado==='NÃO CONFORME'; }).length;
+  const emCampo = ext.filter(e=>(e.statusGeral||'EM CAMPO')==='EM CAMPO').length;
+  const estoque = ext.filter(e=>e.statusGeral==='ESTOQUE').length;
+  const recargaOp = ext.filter(e=>e.statusGeral==='ENVIADO PARA RECARGA').length;
+  const desativado = ext.filter(e=>e.statusGeral==='DESATIVADO').length;
+
+  const valido = recStatus.filter(s=>s==='VÁLIDO').length;
+  const alerta = recStatus.filter(s=>s==='ALERTA').length;
+  const vencido = recStatus.filter(s=>s==='VENCIDO').length;
+
+  const byUsina = {};
+  ext.forEach(e=>{ byUsina[e.usina||'Sem usina']=(byUsina[e.usina||'Sem usina']||0)+1; });
+
+  const expiryBuckets = {
+    "Vencidos":0,
+    "Até 30 dias":0,
+    "31 a 60 dias":0,
+    "61 a 90 dias":0,
+    "Acima de 90 dias":0
+  };
+  ext.forEach(e=>{
+    const d = daysUntil(e.dataRecarga);
+    if(d===null) return;
+    if(d<0) expiryBuckets["Vencidos"]++;
+    else if(d<=30) expiryBuckets["Até 30 dias"]++;
+    else if(d<=60) expiryBuckets["31 a 60 dias"]++;
+    else if(d<=90) expiryBuckets["61 a 90 dias"]++;
+    else expiryBuckets["Acima de 90 dias"]++;
+  });
+
+  const monthKeys = [];
+  const monthLabels = [];
+  const now = new Date();
+  for(let i=5;i>=0;i--){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    monthKeys.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    monthLabels.push(d.toLocaleDateString('pt-BR',{month:'short',year:'2-digit'}).replace('.',''));
+  }
+
+  const monthlyConformity = monthKeys.map(key=>{
+    const list = STATE.inspections.filter(i=>(i.date||'').slice(0,7)===key);
+    if(!list.length) return 0;
+    return Math.round(list.filter(i=>i.resultado==='CONFORME').length/list.length*100);
+  });
+
+  const ncFrequency = {};
+  STATE.inspections.forEach(insp=>{
+    (insp.checklist||[]).forEach(item=>{
+      if(item.valor==='NC'){
+        ncFrequency[item.item]=(ncFrequency[item.item]||0)+1;
+      }
+    });
+  });
+  const topNC = Object.entries(ncFrequency).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+  content.innerHTML = `
+    <div class="grid grid-4">
+      <div class="card stat-card">
+        <div class="label">Total de extintores</div>
+        <div class="value">${ext.length}</div>
+        <div class="bar"><i style="width:100%;background:var(--muted-2)"></i></div>
+      </div>
+      <div class="card stat-card">
+        <div class="label">Recarga válida</div>
+        <div class="value" style="color:var(--success)">${valido}</div>
+        <div class="bar"><i style="width:${ext.length?valido/ext.length*100:0}%;background:var(--success)"></i></div>
+      </div>
+      <div class="card stat-card">
+        <div class="label">Recarga em alerta</div>
+        <div class="value" style="color:var(--warning)">${alerta}</div>
+        <div class="bar"><i style="width:${ext.length?alerta/ext.length*100:0}%;background:var(--warning)"></i></div>
+      </div>
+      <div class="card stat-card">
+        <div class="label">Recarga vencida</div>
+        <div class="value" style="color:var(--danger)">${vencido}</div>
+        <div class="bar"><i style="width:${ext.length?vencido/ext.length*100:0}%;background:var(--danger)"></i></div>
+      </div>
+    </div>
+
+    <div class="dashboard-charts">
+      <div class="card chart-card">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Status operacional</div>
+            <div class="chart-sub">Clique em uma categoria para abrir os extintores correspondentes.</div>
+          </div>
+        </div>
+        <div class="chart-wrap small"><canvas id="chart-status"></canvas></div>
+      </div>
+
+      <div class="card chart-card">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Extintores por usina</div>
+            <div class="chart-sub">Distribuição dos equipamentos cadastrados.</div>
+          </div>
+        </div>
+        <div class="chart-wrap small"><canvas id="chart-usinas"></canvas></div>
+      </div>
+
+      <div class="card chart-card chart-card-wide">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Conformidade das inspeções</div>
+            <div class="chart-sub">Percentual mensal de inspeções conformes nos últimos seis meses.</div>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-conformidade"></canvas></div>
+      </div>
+
+      <div class="card chart-card">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Próximos vencimentos</div>
+            <div class="chart-sub">Quantidade de recargas por faixa de prazo.</div>
+          </div>
+        </div>
+        <div class="chart-wrap small"><canvas id="chart-vencimentos"></canvas></div>
+      </div>
+
+      <div class="card chart-card">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Não conformidades frequentes</div>
+            <div class="chart-sub">Itens do checklist que mais apresentaram problemas.</div>
+          </div>
+        </div>
+        <div class="chart-wrap small">
+          ${topNC.length ? '<canvas id="chart-nc"></canvas>' : '<div class="empty" style="padding:55px 10px;"><h4>Nenhuma não conformidade</h4><p>Os itens aparecerão aqui quando houver registros.</p></div>'}
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Próximos vencimentos de recarga</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nº</th><th>Usina</th><th>Local</th><th>Vencimento</th><th>Dias</th><th>Status</th></tr></thead>
+        <tbody>
+        ${ext.slice().sort((a,b)=> (daysUntil(a.dataRecarga)??9999) - (daysUntil(b.dataRecarga)??9999)).slice(0,8).map(e=>{
+          const s = dateStatus(e.dataRecarga);
+          return `<tr><td>${escapeHtml(e.numero)}</td><td>${escapeHtml(e.usina)}</td><td>${escapeHtml(e.localizacao)}</td><td>${fmtDate(e.dataRecarga)}</td><td>${s.days??'—'}</td><td><span class="chip ${s.cls}">${s.label}</span></td></tr>`;
+        }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  if(typeof Chart==='undefined'){
+    showToast("Os gráficos não puderam ser carregados.","err");
+    return;
+  }
+
+  Chart.defaults.color = '#8b96a3';
+  Chart.defaults.borderColor = 'rgba(139,150,163,.16)';
+  Chart.defaults.font.family = "'Inter', sans-serif";
+
+  const commonPlugins = {
+    legend:{labels:{usePointStyle:true,boxWidth:9,padding:14}},
+    tooltip:{
+      backgroundColor:'#232b33',
+      titleColor:'#e9edf1',
+      bodyColor:'#e9edf1',
+      borderColor:'#333d47',
+      borderWidth:1,
+      padding:10
+    }
+  };
+
+  const statusLabels = ['Em campo','Estoque','Enviado para recarga','Desativado'];
+  const statusValues = [emCampo,estoque,recargaOp,desativado];
+  const statusChart = new Chart(document.getElementById('chart-status'),{
+    type:'doughnut',
+    data:{
+      labels:statusLabels,
+      datasets:[{
+        data:statusValues,
+        backgroundColor:['#3aa66b','#4f7cff','#d9a441','#e0432a'],
+        borderColor:'#1b2128',
+        borderWidth:3,
+        hoverOffset:8
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      cutout:'62%',
+      plugins:commonPlugins,
+      onClick:(evt,elements)=>{
+        if(!elements.length) return;
+        const map=['EM CAMPO','ESTOQUE','ENVIADO PARA RECARGA','DESATIVADO'];
+        extFilters.operational = map[elements[0].index];
+        STATE.view='extinguishers';
+        renderShell();
+      }
+    }
+  });
+  DASHBOARD_CHARTS.push(statusChart);
+
+  const usinaChart = new Chart(document.getElementById('chart-usinas'),{
+    type:'bar',
+    data:{
+      labels:Object.keys(byUsina),
+      datasets:[{
+        label:'Extintores',
+        data:Object.values(byUsina),
+        backgroundColor:'rgba(79,124,255,.65)',
+        borderColor:'#4f7cff',
+        borderWidth:1,
+        borderRadius:6
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      indexAxis:Object.keys(byUsina).length>4?'y':'x',
+      plugins:{...commonPlugins,legend:{display:false}},
+      scales:{
+        y:{beginAtZero:true,ticks:{precision:0}},
+        x:{beginAtZero:true,ticks:{precision:0}}
+      }
+    }
+  });
+  DASHBOARD_CHARTS.push(usinaChart);
+
+  const conformityChart = new Chart(document.getElementById('chart-conformidade'),{
+    type:'line',
+    data:{
+      labels:monthLabels,
+      datasets:[{
+        label:'Conformidade',
+        data:monthlyConformity,
+        borderColor:'#3aa66b',
+        backgroundColor:'rgba(58,166,107,.15)',
+        fill:true,
+        tension:.35,
+        pointRadius:4,
+        pointHoverRadius:6
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:commonPlugins,
+      scales:{
+        y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'}},
+        x:{grid:{display:false}}
+      }
+    }
+  });
+  DASHBOARD_CHARTS.push(conformityChart);
+
+  const expiryChart = new Chart(document.getElementById('chart-vencimentos'),{
+    type:'bar',
+    data:{
+      labels:Object.keys(expiryBuckets),
+      datasets:[{
+        label:'Extintores',
+        data:Object.values(expiryBuckets),
+        backgroundColor:['rgba(224,67,42,.75)','rgba(217,164,65,.75)','rgba(79,124,255,.7)','rgba(58,166,107,.65)','rgba(139,150,163,.55)'],
+        borderRadius:6
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{...commonPlugins,legend:{display:false}},
+      scales:{
+        y:{beginAtZero:true,ticks:{precision:0}},
+        x:{grid:{display:false}}
+      }
+    }
+  });
+  DASHBOARD_CHARTS.push(expiryChart);
+
+  if(topNC.length){
+    const ncChart = new Chart(document.getElementById('chart-nc'),{
+      type:'bar',
+      data:{
+        labels:topNC.map(x=>x[0]),
+        datasets:[{
+          label:'Ocorrências',
+          data:topNC.map(x=>x[1]),
+          backgroundColor:'rgba(224,67,42,.7)',
+          borderColor:'#e0432a',
+          borderWidth:1,
+          borderRadius:6
+        }]
+      },
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        indexAxis:'y',
+        plugins:{...commonPlugins,legend:{display:false}},
+        scales:{
+          x:{beginAtZero:true,ticks:{precision:0}},
+          y:{grid:{display:false}}
+        }
+      }
+    });
+    DASHBOARD_CHARTS.push(ncChart);
+  }
+}
+
+function emptyState(icon,title,text,ctaLabel){
+  return `<div class="empty">${ICONS[icon]||ICONS.ext}<h4>${title}</h4><p>${text}</p>
+    ${ctaLabel?`<div style="margin-top:16px;"><button class="btn btn-accent" id="empty-cta">${ICONS.plus}${ctaLabel}</button></div>`:''}
+  </div>`;
+}
+
+/* ============================================================
+   EXTINGUISHERS LIST
+============================================================ */
+let extFilters = { usina:'', status:'', operational:'', search:'' };
+
+function renderExtinguishers(){
+  setHeader("Extintores", `${STATE.extinguishers.length} cadastrado(s)`,
+    `<button class="btn btn-accent" id="btn-new-ext">${ICONS.plus}Novo extintor</button>`);
+  document.getElementById('btn-new-ext').addEventListener('click', ()=>openExtinguisherModal());
+
+  const content = document.getElementById('content');
+  const usinas = STATE.config.usinas;
+  let list = STATE.extinguishers.slice();
+  if(extFilters.usina) list = list.filter(e=>e.usina===extFilters.usina);
+  if(extFilters.status) list = list.filter(e=>dateStatus(e.dataRecarga).label===extFilters.status);
+  if(extFilters.operational) list = list.filter(e=>(e.statusGeral||'EM CAMPO')===extFilters.operational);
+  if(extFilters.search){
+    const q = extFilters.search.toLowerCase();
+    list = list.filter(e=> (e.numero+e.localizacao+e.usina+e.agente).toLowerCase().includes(q));
+  }
+
+  content.innerHTML = `
+    <div class="filters">
+      <div class="search-box">${ICONS.search}<input type="text" id="f-search" placeholder="Buscar por nº, local, usina..." value="${escapeHtml(extFilters.search)}"></div>
+      <select id="f-usina"><option value="">Todas as usinas</option>${usinas.map(s=>`<option ${extFilters.usina===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}</select>
+      <select id="f-status"><option value="">Todos os status de recarga</option><option ${extFilters.status==='VÁLIDO'?'selected':''}>VÁLIDO</option><option ${extFilters.status==='ALERTA'?'selected':''}>ALERTA</option><option ${extFilters.status==='VENCIDO'?'selected':''}>VENCIDO</option></select><select id="f-operational"><option value="">Todos os status operacionais</option>${['EM CAMPO','ESTOQUE','ENVIADO PARA RECARGA','DESATIVADO'].map(s=>`<option ${extFilters.operational===s?'selected':''}>${s}</option>`).join('')}</select>
+    </div>
+    ${list.length===0 ? emptyState('ext','Nenhum extintor encontrado','Ajuste os filtros ou cadastre um novo extintor.','Cadastrar extintor') : `<div class="grid ext-grid">${list.map(cardExt).join('')}</div>`}
+  `;
+  document.getElementById('empty-cta')?.addEventListener('click', ()=>openExtinguisherModal());
+  document.getElementById('f-search').addEventListener('input', e=>{extFilters.search=e.target.value; renderExtinguishers();});
+  document.getElementById('f-usina').addEventListener('change', e=>{extFilters.usina=e.target.value; renderExtinguishers();});
+  document.getElementById('f-status').addEventListener('change', e=>{extFilters.status=e.target.value; renderExtinguishers();});
+  document.getElementById('f-operational').addEventListener('change', e=>{extFilters.operational=e.target.value; renderExtinguishers();});
+
+  content.querySelectorAll('[data-view-ext]').forEach(b=>b.addEventListener('click', ()=>openExtinguisherDetail(b.dataset.viewExt)));
+  content.querySelectorAll('[data-edit-ext]').forEach(b=>b.addEventListener('click', (e)=>{e.stopPropagation();openExtinguisherModal(b.dataset.editExt);}));
+  content.querySelectorAll('[data-del-ext]').forEach(b=>b.addEventListener('click', (e)=>{e.stopPropagation();deleteExtinguisher(b.dataset.delExt);}));
+}
+
+function operationalStatusMeta(status){
+  const s = (status || 'EM CAMPO').toUpperCase();
+  if(s === 'ESTOQUE') return {label:'ESTOQUE', cls:'estoque'};
+  if(s === 'ENVIADO PARA RECARGA') return {label:'ENVIADO PARA RECARGA', cls:'recarga'};
+  if(s === 'DESATIVADO') return {label:'DESATIVADO', cls:'desativado'};
+  return {label:'EM CAMPO', cls:'em-campo'};
+}
+
+function cardExt(e){
+  const rec = dateStatus(e.dataRecarga);
+  const th = dateStatus(e.dataTH,false);
+  const li = lastInspection(e.id);
+  const st = operationalStatusMeta(e.statusGeral);
+  return `
+  <div class="ext-card status-${st.cls}" data-view-ext="${e.id}" style="cursor:pointer;">
+    <div class="ext-photo">
+      ${e.foto?`<img src="${e.foto}">`:`<div class="no-photo">${ICONS.photo}</div>`}
+      <div class="ext-num">#${escapeHtml(e.numero)}</div>
+    </div>
+    <div class="ext-body">
+      <div class="loc">${escapeHtml(e.localizacao)}</div>
+      <div class="meta">${escapeHtml(e.usina)} · ${escapeHtml(e.agente)} · ${escapeHtml(e.capacidade||'')}</div>
+      <div class="status-op ${st.cls}">${st.label}</div>
+      <div class="ext-chips">
+        <span class="chip ${rec.cls}">Recarga: ${rec.label}</span>
+        <span class="chip ${th.cls}">TH: ${th.label}</span>
+        ${li && li.resultado==='NÃO CONFORME' ? `<span class="chip bad">NC na inspeção</span>` : ''}
+      </div>
+      <div class="ext-actions">
+        <button class="btn btn-sm" data-edit-ext="${e.id}">${ICONS.edit}Editar</button>
+        <button class="btn btn-sm btn-danger" data-del-ext="${e.id}">${ICONS.trash}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function deleteExtinguisher(id){
+  if(!confirm("Excluir este extintor e todo seu histórico de inspeções?")) return;
+  STATE.extinguishers = STATE.extinguishers.filter(e=>e.id!==id);
+  STATE.inspections = STATE.inspections.filter(i=>i.extinguisherId!==id);
+  await persistExtinguishers(); await persistInspections();
+  showToast("Extintor excluído");
+  renderExtinguishers();
+}
+
+/* ============================================================
+   MODAL: NOVO / EDITAR EXTINTOR
+============================================================ */
+function openModal(html){
+  document.getElementById('modal-root').innerHTML = `<div class="overlay" id="overlay">${html}</div>`;
+  document.getElementById('overlay').addEventListener('click', e=>{ if(e.target.id==='overlay') closeModal(); });
+}
+function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
+
+function openExtinguisherModal(id){
+  const editing = !!id;
+  const e = editing ? STATE.extinguishers.find(x=>x.id===id) : {
+    id: uid('EXT'), numero: (Math.max(0,...STATE.extinguishers.map(x=>parseInt(x.numero)||0))+1),
+    foto:null, usina: STATE.config.usinas[0]||'', localizacao:'', agente: STATE.config.agents[0]||'',
+    capacidade:'', dataRecarga:'', dataTH:'', statusGeral:'EM CAMPO',
+  };
+  const usinas = STATE.config.usinas, agents = STATE.config.agents;
+  const checklistAnswers = {};
+  CHECK_ITEMS.forEach((_,i)=>checklistAnswers[i]='C');
+
+  openModal(`
+    <div class="modal">
+      <div class="modal-head"><h3>${editing?'Editar extintor':'Novo extintor'}</h3><button class="icon-btn" id="m-close">${ICONS.close}</button></div>
+      <div class="modal-body">
+        <div class="field"><label>Foto do extintor</label>
+          <label class="photo-upload">
+            ${e.foto?`<img src="${e.foto}" id="photo-preview">`:`${ICONS.upload}<span>Toque para enviar uma foto</span>`}
+            <input type="file" accept="image/*" id="f-foto">
+          </label>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Número</label><input type="text" id="f-numero" value="${escapeHtml(e.numero)}"></div>
+          <div class="field"><label>Status geral</label>
+            <select id="f-statusgeral">
+              ${['EM CAMPO','ESTOQUE','ENVIADO PARA RECARGA','DESATIVADO'].map(s=>`<option ${e.statusGeral===s?'selected':''}>${s}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Usina</label><select id="fm-usina">${usinas.map(s=>`<option ${e.usina===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}</select></div>
+          <div class="field"><label>Localização / Grupo</label><input type="text" id="f-local" placeholder="Ex: Grupo 01" value="${escapeHtml(e.localizacao)}"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Agente extintor</label><select id="f-agente">${agents.map(a=>`<option ${e.agente===a?'selected':''}>${escapeHtml(a)}</option>`).join('')}</select></div>
+          <div class="field"><label>Capacidade (Kg/Lt)</label><input type="text" id="f-cap" placeholder="Ex: 50 KG" value="${escapeHtml(e.capacidade)}"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Vencimento da recarga</label><input type="date" id="f-recarga" value="${e.dataRecarga||''}"></div>
+          <div class="field"><label>Vencimento do teste hidrostático</label><input type="date" id="f-th" value="${e.dataTH||''}"></div>
+        </div>
+        ${editing ? '' : `
+        <div class="section-title">Checklist de inspeção inicial</div>
+        <div class="checklist" id="cad-checklist">
+          ${CHECK_ITEMS.map((label,i)=>`
+            <div class="check-row">
+              <span class="num">${i+1}</span>
+              <span class="label">${label}</span>
+              <div class="seg" data-item="${i}">
+                ${['C','NC','NA','S.A'].map(v=>`<button type="button" data-v="${v}" class="${v==='C'?'sel':''}">${v}</button>`).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="field-row" style="margin-top:14px;">
+          <div class="field"><label>Responsável pela inspeção inicial</label><input type="text" id="f-resp-cad" placeholder="Nome do inspetor"></div>
+          <div class="field"><label>Data da inspeção</label><input type="date" id="f-data-cad" value="${todayISO()}"></div>
+        </div>
+        <div class="field"><label>Observações</label><textarea id="f-obs-cad" placeholder="Ex: mangueira rachada, despressurizado..."></textarea></div>
+        `}
+      </div>
+      <div class="modal-foot">
+        <button class="btn" id="m-cancel">Cancelar</button>
+        <button class="btn btn-accent" id="m-save">${editing?'Salvar alterações':'Cadastrar extintor'}</button>
+      </div>
+    </div>
+  `);
+  document.getElementById('m-close').addEventListener('click', closeModal);
+  document.getElementById('m-cancel').addEventListener('click', closeModal);
+  function bindFotoInput(){
+    document.getElementById('f-foto').addEventListener('change', async ev=>{
+      const file = ev.target.files[0]; if(!file) return;
+      const dataUrl = await fileToDataUrl(file);
+      e.foto = dataUrl;
+      document.querySelector('.photo-upload').innerHTML = `<img src="${dataUrl}"><input type="file" accept="image/*" id="f-foto">`;
+      bindFotoInput();
+    });
+  }
+  bindFotoInput();
+  if(!editing){
+    document.querySelectorAll('#cad-checklist .seg').forEach(seg=>{
+      seg.querySelectorAll('button').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          seg.querySelectorAll('button').forEach(b=>b.classList.remove('sel'));
+          btn.classList.add('sel');
+          checklistAnswers[seg.dataset.item] = btn.dataset.v;
+        });
+      });
+    });
+  }
+  document.getElementById('m-save').addEventListener('click', async ()=>{
+    e.numero = document.getElementById('f-numero').value.trim() || e.numero;
+    e.statusGeral = document.getElementById('f-statusgeral').value;
+    e.usina = document.getElementById('fm-usina').value;
+    e.localizacao = document.getElementById('f-local').value.trim();
+    e.agente = document.getElementById('f-agente').value;
+    e.capacidade = document.getElementById('f-cap').value.trim();
+    e.dataRecarga = document.getElementById('f-recarga').value;
+    e.dataTH = document.getElementById('f-th').value;
+    if(!e.localizacao){ showToast("Informe a localização do extintor","err"); return; }
+    if(!editing){
+      const responsavel = document.getElementById('f-resp-cad').value.trim();
+      if(!responsavel){ showToast("Informe o responsável pela inspeção inicial","err"); return; }
+      STATE.extinguishers.push(e);
+      const resultado = Object.values(checklistAnswers).includes('NC') ? 'NÃO CONFORME' : 'CONFORME';
+      STATE.inspections.push({
+        id: uid('INSP'), extinguisherId: e.id,
+        date: document.getElementById('f-data-cad').value || todayISO(),
+        responsavel, observacoes: document.getElementById('f-obs-cad').value.trim(),
+        checklist: CHECK_ITEMS.map((label,i)=>({item:label, valor:checklistAnswers[i]})),
+        resultado,
+      });
+      await persistInspections();
+    }
+    await persistExtinguishers();
+    closeModal();
+    showToast(editing?"Extintor atualizado":"Extintor cadastrado");
+    renderView();
+  });
+}
+
+/* ============================================================
+   ACESSO RÁPIDO APÓS LEITURA DO QR CODE
+============================================================ */
+function openQuickInspectionPanel(id){
+  const e = STATE.extinguishers.find(x=>x.id===id);
+  if(!e) return;
+
+  const last = lastInspection(e.id);
+  const status = operationalStatusMeta(e.statusGeral);
+  const rec = dateStatus(e.dataRecarga);
+  const th = dateStatus(e.dataTH,false);
+
+  openModal(`
+    <div class="modal" style="max-width:460px;">
+      <div class="modal-head">
+        <div>
+          <h3 style="margin-bottom:2px;">Extintor #${escapeHtml(e.numero)}</h3>
+          <div style="font-size:12px;color:var(--muted);">${escapeHtml(e.usina)}</div>
+        </div>
+        <button class="icon-btn" id="m-close">${ICONS.close}</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="display:flex;gap:14px;align-items:center;margin-bottom:16px;">
+          <div style="width:82px;height:82px;border-radius:10px;overflow:hidden;background:var(--panel-2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            ${e.foto ? `<img src="${e.foto}" style="width:100%;height:100%;object-fit:cover;">` : ICONS.photo}
+          </div>
+          <div style="min-width:0;flex:1;">
+            <div style="font-size:15px;font-weight:700;margin-bottom:3px;">${escapeHtml(e.localizacao)}</div>
+            <div style="font-size:12.5px;color:var(--muted);">${escapeHtml(e.agente)} · ${escapeHtml(e.capacidade || '')}</div>
+            <div class="status-op ${status.cls}" style="margin-top:9px;">${status.label}</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+          <div class="card" style="padding:11px;">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">ÚLTIMA INSPEÇÃO</div>
+            <div style="font-weight:700;">${last ? fmtDate(last.date) : 'Não realizada'}</div>
+          </div>
+          <div class="card" style="padding:11px;">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">RESULTADO</div>
+            <div>${last ? `<span class="chip ${last.resultado==='CONFORME'?'ok':'bad'}">${last.resultado}</span>` : '<span class="chip neutral">SEM REGISTRO</span>'}</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;">
+          <span class="chip ${rec.cls}">Recarga: ${rec.label}</span>
+          <span class="chip ${th.cls}">TH: ${th.label}</span>
+        </div>
+
+        <button class="btn btn-accent" id="quick-inspect" style="width:100%;justify-content:center;padding:13px;margin-bottom:9px;">
+          ${ICONS.scan}Iniciar inspeção
+        </button>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
+          <button class="btn" id="quick-history" style="justify-content:center;">${ICONS.history}Ficha e histórico</button>
+          <button class="btn" id="quick-move" style="justify-content:center;">${ICONS.edit}Movimentar</button>
+        </div>
+
+        <button class="btn btn-ghost" id="quick-cancel" style="width:100%;justify-content:center;margin-top:9px;">Cancelar</button>
+      </div>
+    </div>
+  `);
+
+  document.getElementById('m-close').addEventListener('click', closeModal);
+  document.getElementById('quick-cancel').addEventListener('click', closeModal);
+
+  document.getElementById('quick-inspect').addEventListener('click', ()=>{
+    closeModal();
+    openInspectionModal(e.id);
+  });
+
+  document.getElementById('quick-history').addEventListener('click', ()=>{
+    closeModal();
+    openExtinguisherDetail(e.id);
+  });
+
+  document.getElementById('quick-move').addEventListener('click', ()=>{
+    closeModal();
+    openExtinguisherModal(e.id);
+  });
+}
+
+/* ============================================================
+   DETALHE DO EXTINTOR (QR + histórico)
+============================================================ */
+function openExtinguisherDetail(id){
+  const e = STATE.extinguishers.find(x=>x.id===id);
+  if(!e) return;
+
+  const history = STATE.inspections
+    .filter(i=>i.extinguisherId===id)
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  const last = history[0] || null;
+  const conformes = history.filter(h=>h.resultado==='CONFORME').length;
+  const naoConformes = history.filter(h=>h.resultado==='NÃO CONFORME').length;
+  const total = history.length;
+  const percConformes = total ? Math.round((conformes/total)*100) : 0;
+  const percNC = total ? Math.round((naoConformes/total)*100) : 0;
+  const status = operationalStatusMeta(e.statusGeral);
+
+  const nextDate = last?.date ? new Date(last.date + 'T12:00:00') : null;
+  if(nextDate) nextDate.setMonth(nextDate.getMonth()+1);
+
+  openModal(`
+    <div class="modal ext-full-modal" style="max-width:1240px;">
+      <div class="modal-head ext-full-head">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <h3 style="margin:0;">Extintor #${escapeHtml(e.numero)}</h3>
+            <span class="chip ${status.cls==='em-campo'?'ok':status.cls==='estoque'?'neutral':status.cls==='recarga'?'warn':'bad'}">${status.label}</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:5px;">
+            ${escapeHtml(e.localizacao)} · ${escapeHtml(e.capacidade||'')} · ${escapeHtml(e.agente||'')}
+          </div>
+        </div>
+        <button class="icon-btn" id="m-close">${ICONS.close}</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="ext-detail-tabs">
+          <button class="ext-tab active">${ICONS.history}Inspeções</button>
+          <button class="ext-tab" id="tab-edit-ext">${ICONS.edit}Dados do extintor</button>
+          <button class="ext-tab" id="tab-print-qr">${ICONS.qr}Etiqueta / QR Code</button>
+        </div>
+
+        <div class="ext-detail-grid">
+          <aside class="ext-side-column">
+            <div class="card ext-summary-card">
+              <div style="display:flex;gap:14px;align-items:flex-start;">
+                <div class="ext-photo-box">
+                  ${e.foto
+                    ? `<img src="${e.foto}" alt="Foto do extintor">`
+                    : `<div class="ext-photo-placeholder">SEM FOTO</div>`}
+                </div>
+
+                <div style="min-width:0;flex:1;">
+                  <div class="ext-small-label">Número</div>
+                  <div class="ext-main-value">${escapeHtml(e.numero)}</div>
+
+                  <div class="ext-small-label" style="margin-top:10px;">Localização</div>
+                  <div class="ext-main-text">${escapeHtml(e.usina)}<br>${escapeHtml(e.localizacao)}</div>
+
+                  <div class="ext-small-label" style="margin-top:10px;">Status operacional</div>
+                  <div class="status-op ${status.cls}" style="margin-top:5px;">${status.label}</div>
+                </div>
+              </div>
+
+              <div class="ext-date-block">
+                <div>
+                  <div class="ext-small-label">Última inspeção</div>
+                  <div class="ext-date-value">${last ? fmtDate(last.date) : 'Não realizada'}</div>
+                </div>
+                <div>
+                  <div class="ext-small-label">Próxima inspeção</div>
+                  <div class="ext-date-value">${nextDate ? nextDate.toLocaleDateString('pt-BR') : '—'}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card ext-resume-card">
+              <div class="section-title" style="margin-bottom:12px;">Resumo das inspeções</div>
+
+              <div class="ext-resume-grid">
+                <div class="ext-resume-box">
+                  <div class="ext-resume-icon ok">✓</div>
+                  <div>
+                    <div class="ext-resume-number">${conformes}</div>
+                    <div class="ext-resume-label">Conformes</div>
+                    <div class="ext-resume-percent">${percConformes}%</div>
+                  </div>
+                </div>
+
+                <div class="ext-resume-box">
+                  <div class="ext-resume-icon warn">!</div>
+                  <div>
+                    <div class="ext-resume-number">${naoConformes}</div>
+                    <div class="ext-resume-label">Não conformes</div>
+                    <div class="ext-resume-percent">${percNC}%</div>
+                  </div>
+                </div>
+              </div>
+
+              <button class="btn btn-accent" id="btn-new-history-inspection" style="width:100%;justify-content:center;margin-top:14px;padding:12px;">
+                ${ICONS.scan}Nova inspeção
+              </button>
+            </div>
+
+            <div class="card ext-tip-card">
+              <div style="font-size:12px;font-weight:700;margin-bottom:6px;">Dica</div>
+              <div style="font-size:11.5px;color:var(--muted);line-height:1.5;">
+                Realize inspeções periódicas para manter a segurança e a conformidade do equipamento.
+              </div>
+            </div>
+          </aside>
+
+          <section class="card ext-history-panel">
+            <div class="ext-history-header">
+              <div>
+                <div class="section-title" style="margin:0;">Histórico de inspeções</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:4px;">Todas as inspeções realizadas neste extintor.</div>
+              </div>
+              <div class="chip neutral">${total} registro(s)</div>
+            </div>
+
+            ${history.length===0 ? `
+              <div class="ext-empty-history">
+                Nenhuma inspeção registrada para este extintor.
+              </div>
+            ` : `
+              <div class="ext-timeline">
+                ${history.map((h,index)=>`
+                  <div class="ext-history-row">
+                    <div class="ext-timeline-marker ${h.resultado==='CONFORME'?'ok':'bad'}"></div>
+
+                    <div class="ext-history-date">
+                      <div class="ext-history-date-main">${fmtDate(h.date)}</div>
+                      <div class="ext-history-date-sub">Registro ${history.length-index}</div>
+                    </div>
+
+                    <div class="ext-history-result">
+                      <span class="chip ${h.resultado==='CONFORME'?'ok':'bad'}">${escapeHtml(h.resultado)}</span>
+                      <div class="ext-history-note">${escapeHtml(h.observacoes || (h.resultado==='CONFORME'?'Todos os itens conformes':'Inspeção com não conformidade'))}</div>
+                    </div>
+
+                    <div class="ext-history-responsible">
+                      <div class="ext-small-label">Responsável</div>
+                      <div style="font-weight:700;">${escapeHtml(h.responsavel||'—')}</div>
+                    </div>
+
+                    <div class="ext-history-actions">
+                      <button class="btn btn-sm" data-view-inspection="${h.id}">${ICONS.search}Visualizar</button>
+                      <button class="btn btn-sm btn-primary" data-edit-inspection="${h.id}">${ICONS.edit}Editar</button>
+                      <button class="btn btn-sm btn-danger" data-delete-inspection="${h.id}">${ICONS.trash}Excluir</button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </section>
+        </div>
+      </div>
+    </div>
+  `);
+
+  document.getElementById('m-close').addEventListener('click', closeModal);
+  document.getElementById('btn-new-history-inspection').addEventListener('click', ()=>{ closeModal(); openInspectionModal(e.id); });
+  document.getElementById('tab-edit-ext').addEventListener('click', ()=>{ closeModal(); openExtinguisherModal(e.id); });
+  document.getElementById('tab-print-qr').addEventListener('click', ()=>printSingleLabel(e));
+
+  document.querySelectorAll('[data-view-inspection]').forEach(btn=>{
+    btn.addEventListener('click', ()=>openInspectionView(btn.dataset.viewInspection));
+  });
+
+  document.querySelectorAll('[data-edit-inspection]').forEach(btn=>{
+    btn.addEventListener('click', ()=>openInspectionModal(e.id, btn.dataset.editInspection));
+  });
+
+  document.querySelectorAll('[data-delete-inspection]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const inspectionId = btn.dataset.deleteInspection;
+      const inspection = STATE.inspections.find(i=>i.id===inspectionId);
+      if(!inspection) return;
+
+      const ok = confirm(`Excluir definitivamente a inspeção de ${fmtDate(inspection.date)}?`);
+      if(!ok) return;
+
+      STATE.inspections = STATE.inspections.filter(i=>i.id!==inspectionId);
+      await persistInspections();
+      showToast("Inspeção excluída","ok");
+      openExtinguisherDetail(e.id);
+    });
+  });
+}
+
+function openInspectionView(inspectionId){
+  const inspection = STATE.inspections.find(i=>i.id===inspectionId);
+  if(!inspection) return;
+
+  const e = STATE.extinguishers.find(x=>x.id===inspection.extinguisherId);
+  const checklist = inspection.checklist || [];
+  const isConforme = inspection.resultado === 'CONFORME';
+  const status = operationalStatusMeta(e?.statusGeral);
+
+  const conformeCount = checklist.filter(item=>item.valor==='C').length;
+  const ncCount = checklist.filter(item=>item.valor==='NC').length;
+  const naCount = checklist.filter(item=>item.valor==='NA' || item.valor==='S.A').length;
+
+  openModal(`
+    <div class="modal inspection-view-modal" style="max-width:900px;">
+      <div class="modal-head">
+        <div>
+          <h3 style="margin:0;">Análise da inspeção</h3>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">
+            Extintor #${escapeHtml(e?.numero||'—')} · ${fmtDate(inspection.date)}
+          </div>
+        </div>
+        <button class="icon-btn" id="m-close">${ICONS.close}</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="inspection-result-banner ${isConforme?'ok':'bad'}">
+          <div class="inspection-result-dot"></div>
+          <div>
+            <div class="inspection-result-title">${isConforme?'INSPEÇÃO CONFORME':'INSPEÇÃO NÃO CONFORME'}</div>
+            <div class="inspection-result-sub">
+              ${isConforme
+                ? 'Todos os itens verificados estão em conformidade.'
+                : `${ncCount} item(ns) com não conformidade.`}
+            </div>
+          </div>
+        </div>
+
+        <div class="inspection-summary-grid">
+          <div class="card inspection-summary-card">
+            <div class="inspection-summary-label">Responsável</div>
+            <div class="inspection-summary-value">${escapeHtml(inspection.responsavel||'—')}</div>
+          </div>
+
+          <div class="card inspection-summary-card">
+            <div class="inspection-summary-label">Localização</div>
+            <div class="inspection-summary-value">${escapeHtml(e?.localizacao||'—')}</div>
+            <div class="inspection-summary-sub">${escapeHtml(e?.usina||'')}</div>
+          </div>
+
+          <div class="card inspection-summary-card">
+            <div class="inspection-summary-label">Status operacional</div>
+            <div class="status-op ${status.cls}" style="margin-top:7px;">${status.label}</div>
+          </div>
+
+          <div class="card inspection-summary-card">
+            <div class="inspection-summary-label">Data da inspeção</div>
+            <div class="inspection-summary-value">${fmtDate(inspection.date)}</div>
+          </div>
+        </div>
+
+        <div class="inspection-count-grid">
+          <div class="inspection-count-box ok">
+            <div class="inspection-count-number">${conformeCount}</div>
+            <div class="inspection-count-label">Conformes</div>
+          </div>
+          <div class="inspection-count-box bad">
+            <div class="inspection-count-number">${ncCount}</div>
+            <div class="inspection-count-label">Não conformes</div>
+          </div>
+          <div class="inspection-count-box neutral">
+            <div class="inspection-count-number">${naCount}</div>
+            <div class="inspection-count-label">Não aplicáveis</div>
+          </div>
+        </div>
+
+        <div class="section-title" style="margin-top:18px;">Itens verificados</div>
+
+        <div class="inspection-items-list">
+          ${checklist.map((item,index)=>{
+            const cls = item.valor==='C' ? 'ok' : item.valor==='NC' ? 'bad' : 'neutral';
+            const label = item.valor==='C' ? 'Conforme' : item.valor==='NC' ? 'Não conforme' : item.valor==='NA' ? 'Não aplicável' : 'Sem avaliação';
+            return `
+              <div class="inspection-item-row">
+                <div class="inspection-item-number">${index+1}</div>
+                <div class="inspection-item-text">${escapeHtml(item.item)}</div>
+                <div class="inspection-item-status ${cls}">${label}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <div class="field" style="margin-top:18px;">
+          <label>Observações</label>
+          <div class="card inspection-observation">
+            ${escapeHtml(inspection.observacoes||'Nenhuma observação registrada.')}
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn" id="m-back">Voltar ao histórico</button>
+        <button class="btn btn-accent" id="m-edit-analysis">${ICONS.edit}Editar inspeção</button>
+        <button class="btn btn-danger" id="m-delete-analysis">${ICONS.trash}Excluir</button>
+      </div>
+    </div>
+  `);
+
+  document.getElementById('m-close').addEventListener('click', closeModal);
+  document.getElementById('m-back').addEventListener('click', ()=>openExtinguisherDetail(inspection.extinguisherId));
+  document.getElementById('m-edit-analysis').addEventListener('click', ()=>openInspectionModal(inspection.extinguisherId, inspection.id));
+  document.getElementById('m-delete-analysis').addEventListener('click', async ()=>{
+    const ok = confirm(`Excluir definitivamente a inspeção de ${fmtDate(inspection.date)}?`);
+    if(!ok) return;
+
+    STATE.inspections = STATE.inspections.filter(i=>i.id!==inspection.id);
+    await persistInspections();
+    showToast("Inspeção excluída","ok");
+    openExtinguisherDetail(inspection.extinguisherId);
+  });
+}
+
+function openInspectionModal(extId, inspectionId=null){
+  const e = STATE.extinguishers.find(x=>x.id===extId);
+  if(!e){ showToast("Extintor não encontrado","err"); return; }
+
+  const existing = inspectionId ? STATE.inspections.find(i=>i.id===inspectionId) : null;
+  const answers = {};
+  CHECK_ITEMS.forEach((_,i)=>{
+    answers[i] = existing?.checklist?.[i]?.valor || 'C';
+  });
+
+  openModal(`
+    <div class="modal">
+      <div class="modal-head">
+        <h3>${existing?'Editar inspeção':'Nova inspeção'} · #${escapeHtml(e.numero)} ${escapeHtml(e.localizacao)}</h3>
+        <button class="icon-btn" id="m-close">${ICONS.close}</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="checklist" id="checklist">
+          ${CHECK_ITEMS.map((label,i)=>`
+            <div class="check-row">
+              <span class="num">${i+1}</span>
+              <span class="label">${label}</span>
+              <div class="seg" data-item="${i}">
+                ${['C','NC','NA','S.A'].map(v=>`
+                  <button data-v="${v}" class="${answers[i]===v?'sel':''}">${v}</button>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="field" style="margin-top:16px;">
+          <label>Responsável pela inspeção</label>
+          <input type="text" id="f-resp" placeholder="Nome do inspetor" value="${escapeHtml(existing?.responsavel||'')}">
+        </div>
+
+        <div class="field">
+          <label>Data da inspeção</label>
+          <input type="date" id="f-data" value="${existing?.date || todayISO()}">
+        </div>
+
+        <div class="field">
+          <label>Observações</label>
+          <textarea id="f-obs" placeholder="Ex: mangueira rachada, despressurizado...">${escapeHtml(existing?.observacoes||'')}</textarea>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn" id="m-cancel">Cancelar</button>
+        <button class="btn btn-accent" id="m-save-insp">${existing?'Salvar alterações':'Salvar inspeção'}</button>
+      </div>
+    </div>
+  `);
+
+  document.getElementById('m-close').addEventListener('click', closeModal);
+  document.getElementById('m-cancel').addEventListener('click', ()=>{
+    if(existing) openExtinguisherDetail(extId);
+    else closeModal();
+  });
+
+  document.querySelectorAll('#checklist .seg').forEach(seg=>{
+    seg.querySelectorAll('button').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        seg.querySelectorAll('button').forEach(b=>b.classList.remove('sel'));
+        btn.classList.add('sel');
+        answers[seg.dataset.item] = btn.dataset.v;
+      });
+    });
+  });
+
+  document.getElementById('m-save-insp').addEventListener('click', async ()=>{
+    const responsavel = document.getElementById('f-resp').value.trim();
+    if(!responsavel){ showToast("Informe o responsável pela inspeção","err"); return; }
+
+    const resultado = Object.values(answers).includes('NC') ? 'NÃO CONFORME' : 'CONFORME';
+    const updatedData = {
+      extinguisherId: extId,
+      date: document.getElementById('f-data').value || todayISO(),
+      responsavel,
+      observacoes: document.getElementById('f-obs').value.trim(),
+      checklist: CHECK_ITEMS.map((label,i)=>({item:label, valor:answers[i]})),
+      resultado,
+    };
+
+    if(existing){
+      Object.assign(existing, updatedData);
+    }else{
+      STATE.inspections.push({id:uid('INSP'), ...updatedData});
+    }
+
+    await persistInspections();
+    showToast(existing ? "Inspeção atualizada" : `Inspeção registrada — ${resultado}`, resultado==='CONFORME'?'ok':'err');
+    openExtinguisherDetail(extId);
+    renderView();
+  });
+}
+
+/* ============================================================
+   PRINT QR LABEL (individual)
+============================================================ */
+function printSingleLabel(e){
+  const holder = document.getElementById('print-area');
+  const qrId = 'print-qr-'+Date.now();
+  holder.innerHTML = `<div class="print-only" style="display:flex;justify-content:center;padding:40px;">
+    <div class="qr-label-preview" style="width:260px;">
+      <div class="top-stripe"></div>
+      <div id="${qrId}" style="display:flex;justify-content:center;"></div>
+      <b>#${escapeHtml(e.numero)} — ${escapeHtml(e.localizacao)}</b>
+      <div class="company">${escapeHtml(STATE.config.companyName)} · ${escapeHtml(e.usina)}</div>
+    </div>
+  </div>`;
+  new QRCode(document.getElementById(qrId), {text:extinguisherDirectUrl(e.id), width:160, height:160});
+  setTimeout(()=>window.print(), 200);
+}
+
+/* ============================================================
+   INSPECIONAR (scan + checklist)
+============================================================ */
+let scanStream = null, scanRAF = null;
+
+function renderInspect(){
+  setHeader("Inspecionar","Escaneie o QR Code do extintor ou selecione manualmente");
+  const content = document.getElementById('content');
+
+  content.innerHTML = `
+    <div class="inspect-layout">
+      <section class="inspect-card">
+        <div class="inspect-card-head">
+          <h2 class="inspect-card-title">Escanear QR Code</h2>
+          <div class="inspect-card-desc">
+            Ative a câmera e centralize o QR Code da etiqueta para identificar o extintor automaticamente.
+          </div>
+        </div>
+
+        <div class="inspect-scanner-shell">
+          <div class="scanner-wrap" id="scanner-wrap">
+            <video id="scan-video" playsinline muted></video>
+            <div class="scan-frame"></div>
+          </div>
+        </div>
+
+        <div class="inspect-note" id="scan-hint">
+          Toque em “Ativar câmera” e aponte para o QR Code do extintor.
+        </div>
+
+        <div class="inspect-actions">
+          <button class="btn btn-accent" id="btn-start-scan">Ativar câmera</button>
+          <div class="inspect-divider">ou</div>
+          <button class="btn" id="btn-focus-manual">Selecionar extintor manualmente</button>
+        </div>
+      </section>
+
+      <section class="inspect-card">
+        <div class="inspect-card-head">
+          <h2 class="inspect-card-title">Selecionar manualmente</h2>
+          <div class="inspect-card-desc">
+            Pesquise pelo número, local ou usina e escolha o equipamento para iniciar a inspeção.
+          </div>
+        </div>
+
+        <div class="search-box manual-search-wrap">
+          ${ICONS.search}
+          <input type="text" id="manual-search" placeholder="Buscar por número, local ou usina...">
+        </div>
+
+        <div id="manual-list" class="manual-list"></div>
+      </section>
+    </div>
+
+    <div class="inspect-help">
+      <div class="inspect-help-item">
+        <div class="inspect-help-step">ETAPA 01</div>
+        <div class="inspect-help-title">Identificar o extintor</div>
+        <div class="inspect-help-text">
+          Leia o QR Code ou localize o equipamento pela busca manual.
+        </div>
+      </div>
+
+      <div class="inspect-help-item">
+        <div class="inspect-help-step">ETAPA 02</div>
+        <div class="inspect-help-title">Conferir os dados</div>
+        <div class="inspect-help-text">
+          Verifique número, usina, localização e situação operacional.
+        </div>
+      </div>
+
+      <div class="inspect-help-item">
+        <div class="inspect-help-step">ETAPA 03</div>
+        <div class="inspect-help-title">Realizar a inspeção</div>
+        <div class="inspect-help-text">
+          Preencha o checklist e salve para atualizar o histórico do equipamento.
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('btn-start-scan').addEventListener('click', startScanner);
+  document.getElementById('btn-focus-manual').addEventListener('click', ()=>{
+    document.getElementById('manual-search').focus();
+    document.getElementById('manual-search').scrollIntoView({behavior:'smooth',block:'center'});
+  });
+
+  renderManualList('');
+  document.getElementById('manual-search').addEventListener('input', e=>renderManualList(e.target.value));
+}
+
+function renderManualList(q){
+  const el = document.getElementById('manual-list');
+  if(!el) return;
+
+  q = String(q||'').trim().toLowerCase();
+  const list = STATE.extinguishers.filter(e=>{
+    const haystack = `${e.numero||''} ${e.localizacao||''} ${e.usina||''} ${e.agente||''}`.toLowerCase();
+    return !q || haystack.includes(q);
+  });
+
+  if(list.length===0){
+    el.innerHTML = `
+      <div class="empty" style="padding:38px 14px;">
+        <h4>Nenhum extintor encontrado</h4>
+        <p>Revise o número, local ou usina informados.</p>
+      </div>
+    `;
+    return;
+  }
+
+  function statusClass(status){
+    if(status==='ESTOQUE') return 'estoque';
+    if(status==='ENVIADO PARA RECARGA') return 'recarga';
+    if(status==='DESATIVADO') return 'desativado';
+    return 'em-campo';
+  }
+
+  el.innerHTML = list.map(e=>{
+    const status = e.statusGeral || 'EM CAMPO';
+    return `
+      <button class="manual-ext-row" data-pick="${e.id}">
+        <div class="manual-ext-main">
+          <div class="manual-ext-number">#${escapeHtml(e.numero)}</div>
+          <div class="manual-ext-usina">${escapeHtml(e.usina||'Usina não informada')}</div>
+          <div class="manual-ext-local">${escapeHtml(e.localizacao||'Local não informado')}</div>
+        </div>
+        <div class="manual-ext-side">
+          <div class="manual-ext-meta">${escapeHtml(e.agente||'—')} · ${escapeHtml(e.capacidade||'—')}</div>
+          <span class="manual-ext-status ${statusClass(status)}">${escapeHtml(status)}</span>
+        </div>
+      </button>
+    `;
+  }).join('');
+
+  el.querySelectorAll('[data-pick]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      stopScanner();
+      openQuickInspectionPanel(b.dataset.pick);
+    });
+  });
+}
+
+async function startScanner(){
+  const video = document.getElementById('scan-video');
+  const hint = document.getElementById('scan-hint');
+  const button = document.getElementById('btn-start-scan');
+
+  try{
+    stopScanner();
+
+    scanStream = await navigator.mediaDevices.getUserMedia({
+      video:{
+        facingMode:{ideal:'environment'},
+        width:{ideal:1920},
+        height:{ideal:1080},
+        focusMode:{ideal:'continuous'}
+      },
+      audio:false
+    });
+
+    video.srcObject = scanStream;
+    await video.play();
+
+    if(button){
+      button.disabled = true;
+      button.textContent = "Câmera ativa";
+    }
+
+    hint.textContent = "Centralize o QR Code dentro do quadro e aproxime lentamente.";
+
+    let detector = null;
+    if('BarcodeDetector' in window){
+      try{
+        const supported = await BarcodeDetector.getSupportedFormats();
+        if(supported.includes('qr_code')){
+          detector = new BarcodeDetector({formats:['qr_code']});
+        }
+      }catch(e){
+        console.warn("BarcodeDetector indisponível", e);
+      }
+    }
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', {willReadFrequently:true});
+    let lastRead = 0;
+
+    async function tick(timestamp=0){
+      if(!scanStream) return;
+      if(!video.videoWidth || !video.videoHeight){
+        scanRAF = requestAnimationFrame(tick);
+        return;
+      }
+
+      // Limita a leitura para evitar travamentos em celulares.
+      if(timestamp - lastRead < 120){
+        scanRAF = requestAnimationFrame(tick);
+        return;
+      }
+      lastRead = timestamp;
+
+      let decodedData = null;
+
+      // Primeiro tenta o leitor nativo do navegador, que costuma ser mais preciso.
+      if(detector){
+        try{
+          const codes = await detector.detect(video);
+          if(codes && codes.length){
+            decodedData = codes[0].rawValue;
+          }
+        }catch(e){
+          console.warn("Falha no leitor nativo", e);
+          detector = null;
+        }
+      }
+
+      // Fallback para jsQR.
+      if(!decodedData){
+        const maxWidth = 1280;
+        const scale = Math.min(1, maxWidth / video.videoWidth);
+        canvas.width = Math.round(video.videoWidth * scale);
+        canvas.height = Math.round(video.videoHeight * scale);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(
+          imgData.data,
+          canvas.width,
+          canvas.height,
+          {inversionAttempts:'attemptBoth'}
+        );
+
+        if(code && code.data) decodedData = code.data;
+      }
+
+      if(decodedData){
+        const extId = extinguisherIdFromQrData(decodedData);
+        const ext = STATE.extinguishers.find(e=>e.id===extId);
+
+        if(ext){
+          if(navigator.vibrate) navigator.vibrate(120);
+          stopScanner();
+          openQuickInspectionPanel(ext.id);
+          return;
+        }
+
+        hint.textContent = "QR Code reconhecido, mas não corresponde a um extintor cadastrado.";
+      }
+
+      scanRAF = requestAnimationFrame(tick);
+    }
+
+    scanRAF = requestAnimationFrame(tick);
+  }catch(err){
+    console.error("Scanner error", err);
+    hint.textContent = "Não foi possível acessar a câmera. Verifique a permissão do navegador.";
+    showToast("Câmera indisponível","err");
+
+    if(button){
+      button.disabled = false;
+      button.innerHTML = `${ICONS.camera}Ativar câmera`;
+    }
+  }
+}
+function stopScanner(){
+  if(scanRAF){
+    cancelAnimationFrame(scanRAF);
+    scanRAF = null;
+  }
+  if(scanStream){
+    scanStream.getTracks().forEach(t=>t.stop());
+    scanStream = null;
+  }
+
+  const video = document.getElementById('scan-video');
+  if(video) video.srcObject = null;
+
+  const button = document.getElementById('btn-start-scan');
+  if(button){
+    button.disabled = false;
+    button.innerHTML = `${ICONS.camera}Ativar câmera`;
+  }
+}
+
+/* ============================================================
+   MODAL DE INSPEÇÃO (checklist)
+============================================================ */
+function openInspectionModal(extId, inspectionId=null){
+  const e = STATE.extinguishers.find(x=>x.id===extId);
+  if(!e){ showToast("Extintor não encontrado","err"); return; }
+
+  const existing = inspectionId ? STATE.inspections.find(i=>i.id===inspectionId) : null;
+  const answers = {};
+  CHECK_ITEMS.forEach((_,i)=>{
+    answers[i] = existing?.checklist?.[i]?.valor || 'C';
+  });
+
+  openModal(`
+    <div class="modal">
+      <div class="modal-head">
+        <h3>${existing?'Editar inspeção':'Nova inspeção'} · #${escapeHtml(e.numero)} ${escapeHtml(e.localizacao)}</h3>
+        <button class="icon-btn" id="m-close">${ICONS.close}</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="checklist" id="checklist">
+          ${CHECK_ITEMS.map((label,i)=>`
+            <div class="check-row">
+              <span class="num">${i+1}</span>
+              <span class="label">${label}</span>
+              <div class="seg" data-item="${i}">
+                ${['C','NC','NA','S.A'].map(v=>`
+                  <button data-v="${v}" class="${answers[i]===v?'sel':''}">${v}</button>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="field" style="margin-top:16px;">
+          <label>Responsável pela inspeção</label>
+          <input type="text" id="f-resp" placeholder="Nome do inspetor" value="${escapeHtml(existing?.responsavel||'')}">
+        </div>
+
+        <div class="field">
+          <label>Data da inspeção</label>
+          <input type="date" id="f-data" value="${existing?.date || todayISO()}">
+        </div>
+
+        <div class="field">
+          <label>Observações</label>
+          <textarea id="f-obs" placeholder="Ex: mangueira rachada, despressurizado...">${escapeHtml(existing?.observacoes||'')}</textarea>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn" id="m-cancel">Cancelar</button>
+        <button class="btn btn-accent" id="m-save-insp">${existing?'Salvar alterações':'Salvar inspeção'}</button>
+      </div>
+    </div>
+  `);
+
+  document.getElementById('m-close').addEventListener('click', closeModal);
+  document.getElementById('m-cancel').addEventListener('click', ()=>{
+    if(existing) openExtinguisherDetail(extId);
+    else closeModal();
+  });
+
+  document.querySelectorAll('#checklist .seg').forEach(seg=>{
+    seg.querySelectorAll('button').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        seg.querySelectorAll('button').forEach(b=>b.classList.remove('sel'));
+        btn.classList.add('sel');
+        answers[seg.dataset.item] = btn.dataset.v;
+      });
+    });
+  });
+
+  document.getElementById('m-save-insp').addEventListener('click', async ()=>{
+    const responsavel = document.getElementById('f-resp').value.trim();
+    if(!responsavel){ showToast("Informe o responsável pela inspeção","err"); return; }
+
+    const resultado = Object.values(answers).includes('NC') ? 'NÃO CONFORME' : 'CONFORME';
+    const updatedData = {
+      extinguisherId: extId,
+      date: document.getElementById('f-data').value || todayISO(),
+      responsavel,
+      observacoes: document.getElementById('f-obs').value.trim(),
+      checklist: CHECK_ITEMS.map((label,i)=>({item:label, valor:answers[i]})),
+      resultado,
+    };
+
+    if(existing){
+      Object.assign(existing, updatedData);
+    }else{
+      STATE.inspections.push({id:uid('INSP'), ...updatedData});
+    }
+
+    await persistInspections();
+    showToast(existing ? "Inspeção atualizada" : `Inspeção registrada — ${resultado}`, resultado==='CONFORME'?'ok':'err');
+    openExtinguisherDetail(extId);
+    renderView();
+  });
+}
+
+/* ============================================================
+   PRINT QR LABEL (individual)
+============================================================ */
+function printSingleLabel(e){
+  const holder = document.getElementById('print-area');
+  const qrId = 'print-qr-'+Date.now();
+  holder.innerHTML = `<div class="print-only" style="display:flex;justify-content:center;padding:40px;">
+    <div class="qr-label-preview" style="width:260px;">
+      <div class="top-stripe"></div>
+      <div id="${qrId}" style="display:flex;justify-content:center;"></div>
+      <b>#${escapeHtml(e.numero)} — ${escapeHtml(e.localizacao)}</b>
+      <div class="company">${escapeHtml(STATE.config.companyName)} · ${escapeHtml(e.usina)}</div>
+    </div>
+  </div>`;
+  new QRCode(document.getElementById(qrId), {text:extinguisherDirectUrl(e.id), width:160, height:160});
+  setTimeout(()=>window.print(), 200);
+}
+
+/* ============================================================
+   RELATÓRIOS / PDF
+============================================================ */
+let reportFilters = {
+  usina:'',
+  status:'',
+  operational:'',
+  resultado:'',
+  dateFrom:'',
+  dateTo:''
+};
+
+function renderReports(){
+  setHeader("Relatórios","Gere relatórios profissionais para controle, auditorias e impressão");
+  const content = document.getElementById('content');
+  const usinas = STATE.config.usinas;
+
+  content.innerHTML = `
+    <div class="reports-layout">
+      <section class="report-card">
+        <div class="report-card-head">
+          <div>
+            <h2 class="report-card-title">Relatório geral (PDF)</h2>
+            <div class="report-card-desc">
+              Relatório executivo em A4 paisagem, com indicadores, filtros utilizados, tabela operacional, legendas, assinaturas e páginas numeradas.
+            </div>
+          </div>
+        </div>
+
+        <div class="report-info">
+          O relatório incluirá os dados dos extintores e das inspeções conforme os filtros selecionados abaixo.
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Usina</label>
+            <select id="r-usina">
+              <option value="">Todas as usinas</option>
+              ${usinas.map(s=>`<option>${escapeHtml(s)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label>Status de recarga</label>
+            <select id="r-status">
+              <option value="">Todos</option>
+              <option>VÁLIDO</option>
+              <option>ALERTA</option>
+              <option>VENCIDO</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Situação operacional</label>
+            <select id="r-operational">
+              <option value="">Todas</option>
+              <option>EM CAMPO</option>
+              <option>ESTOQUE</option>
+              <option>ENVIADO PARA RECARGA</option>
+              <option>DESATIVADO</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Resultado da última inspeção</label>
+            <select id="r-result">
+              <option value="">Todos</option>
+              <option>CONFORME</option>
+              <option>NÃO CONFORME</option>
+              <option>SEM INSPEÇÃO</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Inspeções a partir de</label>
+            <input type="date" id="r-date-from">
+          </div>
+          <div class="field">
+            <label>Inspeções até</label>
+            <input type="date" id="r-date-to">
+          </div>
+        </div>
+
+        <div class="report-actions">
+          <button class="btn btn-accent report-primary" id="btn-gen-pdf">
+            Gerar relatório PDF
+          </button>
+        </div>
+
+        <div class="report-foot-note">
+          Os dados são gerados em tempo real com base nas informações sincronizadas pelo sistema.
+        </div>
+      </section>
+
+      <aside class="report-side">
+        <section class="report-card report-qr-card">
+          <div class="report-card-head">
+            <div>
+              <h2 class="report-card-title">Etiquetas QR Code</h2>
+              <div class="report-card-desc">
+                Gere uma folha com o QR Code dos extintores cadastrados para impressão e identificação em campo.
+              </div>
+            </div>
+          </div>
+
+          <div class="report-info success">
+            Cada etiqueta é gerada com o QR Code correspondente ao extintor cadastrado no sistema.
+          </div>
+
+          <div class="report-actions">
+            <button class="btn" id="btn-print-all-qr" style="width:100%;justify-content:center;">
+              Imprimir todas as etiquetas
+            </button>
+          </div>
+        </section>
+
+        <section class="report-card">
+          <div class="report-card-head" style="margin-bottom:0;border-bottom:0;padding-bottom:0;">
+            <div>
+              <h2 class="report-card-title">Boas práticas</h2>
+              <div class="report-card-desc">
+                Utilize os filtros para gerar relatórios mais objetivos e confira os dados antes da impressão.
+              </div>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <div class="report-tips">
+      <div class="report-tip">
+        <div class="report-tip-title">Filtros específicos</div>
+        <div class="report-tip-text">
+          Filtre por usina, status, situação operacional, resultado e período para obter relatórios mais precisos.
+        </div>
+      </div>
+
+      <div class="report-tip">
+        <div class="report-tip-title">Formato profissional</div>
+        <div class="report-tip-text">
+          O PDF é gerado em A4 paisagem, pronto para impressão, auditorias e compartilhamento.
+        </div>
+      </div>
+
+      <div class="report-tip">
+        <div class="report-tip-title">Dados atualizados</div>
+        <div class="report-tip-text">
+          As informações utilizadas no relatório refletem os registros salvos e sincronizados no Firebase.
+        </div>
+      </div>
+
+      <div class="report-tip">
+        <div class="report-tip-title">Impressão ideal</div>
+        <div class="report-tip-text">
+          Para melhor resultado, utilize impressão em A4 paisagem e qualidade alta quando necessário.
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('btn-gen-pdf').addEventListener('click', ()=>{
+    reportFilters.usina = document.getElementById('r-usina').value;
+    reportFilters.status = document.getElementById('r-status').value;
+    reportFilters.operational = document.getElementById('r-operational').value;
+    reportFilters.resultado = document.getElementById('r-result').value;
+    reportFilters.dateFrom = document.getElementById('r-date-from').value;
+    reportFilters.dateTo = document.getElementById('r-date-to').value;
+    generateGeneralPdf();
+  });
+
+  document.getElementById('btn-print-all-qr').addEventListener('click', printAllLabels);
+}
+
+function generateGeneralPdf(){
+  if(STATE.extinguishers.length===0){
+    showToast("Cadastre extintores antes de gerar o relatório","err");
+    return;
+  }
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    showToast("Biblioteca de PDF não carregou. Verifique sua conexão e recarregue a página.","err");
+    return;
+  }
+
+  try{
+    const {jsPDF} = window.jspdf;
+    const doc = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
+    if(typeof doc.autoTable !== 'function'){
+      showToast("Biblioteca de tabelas do PDF não carregou. Recarregue a página e tente novamente.","err");
+      return;
+    }
+
+    const cfg = STATE.config;
+    let list = STATE.extinguishers.slice();
+
+    if(reportFilters.usina){
+      list = list.filter(e=>e.usina===reportFilters.usina);
+    }
+    if(reportFilters.status){
+      list = list.filter(e=>dateStatus(e.dataRecarga).label===reportFilters.status);
+    }
+    if(reportFilters.operational){
+      list = list.filter(e=>(e.statusGeral||'EM CAMPO')===reportFilters.operational);
+    }
+    if(reportFilters.resultado){
+      list = list.filter(e=>{
+        const li = lastInspection(e.id);
+        if(reportFilters.resultado==='SEM INSPEÇÃO') return !li;
+        return li && li.resultado===reportFilters.resultado;
+      });
+    }
+    if(reportFilters.dateFrom){
+      list = list.filter(e=>{
+        const li = lastInspection(e.id);
+        return li && li.date >= reportFilters.dateFrom;
+      });
+    }
+    if(reportFilters.dateTo){
+      list = list.filter(e=>{
+        const li = lastInspection(e.id);
+        return li && li.date <= reportFilters.dateTo;
+      });
+    }
+
+    if(list.length===0){
+      showToast("Nenhum extintor corresponde aos filtros selecionados.","err");
+      return;
+    }
+
+    list.sort((a,b)=>{
+      const usinaCmp = (a.usina||'').localeCompare(b.usina||'','pt-BR');
+      if(usinaCmp!==0) return usinaCmp;
+      return String(a.numero||'').localeCompare(String(b.numero||''),'pt-BR',{numeric:true});
+    });
+
+    const total = list.length;
+    const conformes = list.filter(e=>{
+      const li=lastInspection(e.id);
+      return li && li.resultado==='CONFORME';
+    }).length;
+    const naoConformes = list.filter(e=>{
+      const li=lastInspection(e.id);
+      return li && li.resultado==='NÃO CONFORME';
+    }).length;
+    const vencidos = list.filter(e=>dateStatus(e.dataRecarga).label==='VENCIDO').length;
+    const emRecarga = list.filter(e=>e.statusGeral==='ENVIADO PARA RECARGA').length;
+    const estoque = list.filter(e=>e.statusGeral==='ESTOQUE').length;
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const marginX = 34;
+    const issuedAt = new Date().toLocaleDateString('pt-BR');
+
+    function drawHeader(){
+      if(cfg.logo){
+        try{ doc.addImage(cfg.logo, 'JPEG', marginX, 20, 42, 42); }catch(e){}
+      }
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(16);
+      doc.setTextColor(25,30,35);
+      doc.text(cfg.companyName || 'Empresa', 88, 38);
+
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(10);
+      doc.setTextColor(85,92,100);
+      doc.text('Relatório de Inspeção e Controle de Extintores', 88, 55);
+
+      doc.setFontSize(9);
+      doc.text(`Emitido em ${issuedAt}`, pageWidth-marginX, 34, {align:'right'});
+      doc.text('Sistema de Gestão de Extintores', pageWidth-marginX, 49, {align:'right'});
+
+      doc.setDrawColor(224,67,42);
+      doc.setLineWidth(2);
+      doc.line(marginX, 68, pageWidth-marginX, 68);
+      doc.setTextColor(0);
+    }
+
+    function drawFooter(pageNumber, totalPages){
+      doc.setDrawColor(210,214,219);
+      doc.setLineWidth(.5);
+      doc.line(marginX, pageHeight-32, pageWidth-marginX, pageHeight-32);
+
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(110,116,124);
+      doc.text(
+        'Relatório gerado automaticamente pelo Sistema de Gestão de Extintores.',
+        marginX,
+        pageHeight-18
+      );
+      doc.text(
+        `Página ${pageNumber} de ${totalPages}`,
+        pageWidth-marginX,
+        pageHeight-18,
+        {align:'right'}
+      );
+      doc.setTextColor(0);
+    }
+
+    drawHeader();
+
+    // Filtros utilizados
+    const filters = [
+      `Usina: ${reportFilters.usina || 'Todas'}`,
+      `Recarga: ${reportFilters.status || 'Todos'}`,
+      `Situação: ${reportFilters.operational || 'Todas'}`,
+      `Resultado: ${reportFilters.resultado || 'Todos'}`,
+      `Período: ${
+        reportFilters.dateFrom ? fmtDate(reportFilters.dateFrom) : 'Início'
+      } a ${
+        reportFilters.dateTo ? fmtDate(reportFilters.dateTo) : 'Atual'
+      }`
+    ];
+
+    doc.setFillColor(246,247,249);
+    doc.roundedRect(marginX, 78, pageWidth-(marginX*2), 34, 5, 5, 'F');
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(8);
+    doc.setTextColor(65,71,78);
+    doc.text('FILTROS UTILIZADOS', marginX+10, 91);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(7.5);
+    doc.text(filters.join('   |   '), marginX+10, 104);
+
+    // Cartões de resumo executivo
+    const cards = [
+      {label:'TOTAL', value:total, fill:[239,242,245], text:[40,47,54]},
+      {label:'CONFORMES', value:conformes, fill:[230,246,237], text:[30,130,80]},
+      {label:'NÃO CONFORMES', value:naoConformes, fill:[253,235,232], text:[200,55,35]},
+      {label:'VENCIDOS', value:vencidos, fill:[253,235,232], text:[200,55,35]},
+      {label:'EM RECARGA', value:emRecarga, fill:[255,246,224], text:[155,105,10]},
+      {label:'ESTOQUE', value:estoque, fill:[234,240,255], text:[55,90,170]}
+    ];
+    const gap = 8;
+    const cardWidth = (pageWidth-(marginX*2)-(gap*5))/6;
+    cards.forEach((card,index)=>{
+      const x = marginX + index*(cardWidth+gap);
+      doc.setFillColor(...card.fill);
+      doc.roundedRect(x, 121, cardWidth, 48, 5, 5, 'F');
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(16);
+      doc.setTextColor(...card.text);
+      doc.text(String(card.value), x+cardWidth/2, 143, {align:'center'});
+      doc.setFontSize(7);
+      doc.text(card.label, x+cardWidth/2, 159, {align:'center'});
+    });
+    doc.setTextColor(0);
+
+    const rows = list.map(e=>{
+      const rec = dateStatus(e.dataRecarga);
+      const th = dateStatus(e.dataTH,false);
+      const li = lastInspection(e.id);
+      const days = daysUntil(e.dataRecarga);
+      const daysLabel = days===null ? '—' : days===0 ? 'HOJE' : String(days);
+
+      return [
+        e.numero,
+        e.usina,
+        e.localizacao,
+        e.agente,
+        e.capacidade||'',
+        fmtDate(e.dataRecarga),
+        daysLabel,
+        rec.label,
+        fmtDate(e.dataTH),
+        th.label,
+        e.statusGeral||'EM CAMPO',
+        li ? fmtDate(li.date) : '—',
+        li ? li.resultado : 'SEM INSPEÇÃO',
+        li ? (li.observacoes||'—') : '—'
+      ];
+    });
+
+    doc.autoTable({
+      startY: 181,
+      head:[[
+        'Nº','Usina','Local','Agente','Kg/Lt',
+        'Venc. Recarga','Dias','Status',
+        'Venc. TH','Status TH','Situação',
+        'Últ. Insp.','Resultado','Observações'
+      ]],
+      body:rows,
+      styles:{
+        fontSize:6.8,
+        cellPadding:3.3,
+        valign:'middle',
+        overflow:'linebreak',
+        lineColor:[226,229,233],
+        lineWidth:.15
+      },
+      headStyles:{
+        fillColor:[224,67,42],
+        textColor:255,
+        fontStyle:'bold',
+        halign:'center',
+        fontSize:6.7
+      },
+      alternateRowStyles:{fillColor:[247,248,250]},
+      columnStyles:{
+        0:{cellWidth:22,halign:'center'},
+        1:{cellWidth:83},
+        2:{cellWidth:72},
+        3:{cellWidth:42},
+        4:{cellWidth:29,halign:'center'},
+        5:{cellWidth:57,halign:'center'},
+        6:{cellWidth:31,halign:'center'},
+        7:{cellWidth:44,halign:'center'},
+        8:{cellWidth:52,halign:'center'},
+        9:{cellWidth:43,halign:'center'},
+        10:{cellWidth:76},
+        11:{cellWidth:53,halign:'center'},
+        12:{cellWidth:64,halign:'center'},
+        13:{cellWidth:'auto'}
+      },
+      didParseCell:function(data){
+        if(data.section!=='body') return;
+
+        const row = data.row.raw;
+        const result = row[12];
+        const recStatus = row[7];
+
+        // Destaque suave da linha quando houver não conformidade.
+        if(result==='NÃO CONFORME'){
+          data.cell.styles.fillColor=[255,239,237];
+        }
+
+        const value = data.cell.raw;
+        if(value==='VENCIDO' || value==='NÃO CONFORME'){
+          data.cell.styles.textColor=[196,48,31];
+          data.cell.styles.fontStyle='bold';
+        }
+        if(value==='ALERTA'){
+          data.cell.styles.textColor=[161,109,9];
+          data.cell.styles.fontStyle='bold';
+        }
+        if(value==='VÁLIDO' || value==='CONFORME'){
+          data.cell.styles.textColor=[28,125,75];
+          data.cell.styles.fontStyle='bold';
+        }
+        if(value==='SEM INSPEÇÃO'){
+          data.cell.styles.textColor=[105,112,120];
+          data.cell.styles.fontStyle='bold';
+        }
+
+        if(data.column.index===6){
+          const numeric = Number(value);
+          if(value==='HOJE'){
+            data.cell.styles.textColor=[161,109,9];
+            data.cell.styles.fontStyle='bold';
+          }else if(!Number.isNaN(numeric)){
+            if(numeric<0){
+              data.cell.styles.textColor=[196,48,31];
+              data.cell.styles.fontStyle='bold';
+            }else if(numeric<=30){
+              data.cell.styles.textColor=[161,109,9];
+              data.cell.styles.fontStyle='bold';
+            }
+          }
+        }
+      },
+      didDrawPage:function(){
+        if(doc.internal.getNumberOfPages()>1){
+          drawHeader();
+        }
+      },
+      margin:{left:marginX,right:marginX,top:78,bottom:82}
+    });
+
+    // Bloco final com legenda e assinaturas.
+    let finalY = doc.lastAutoTable.finalY + 14;
+    if(finalY > pageHeight-120){
+      doc.addPage();
+      drawHeader();
+      finalY = 92;
+    }
+
+    doc.setFillColor(247,248,250);
+    doc.roundedRect(marginX, finalY, pageWidth-(marginX*2), 28, 4, 4, 'F');
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(70,76,83);
+    doc.text('LEGENDA:', marginX+9, finalY+17);
+
+    const legendItems = [
+      {label:'CONFORME / VÁLIDO', color:[28,125,75]},
+      {label:'ALERTA / ATÉ 30 DIAS', color:[161,109,9]},
+      {label:'NÃO CONFORME / VENCIDO', color:[196,48,31]},
+      {label:'SEM INSPEÇÃO', color:[105,112,120]}
+    ];
+    let legendX = marginX+65;
+    legendItems.forEach(item=>{
+      doc.setFillColor(...item.color);
+      doc.circle(legendX, finalY+14, 3, 'F');
+      doc.setTextColor(...item.color);
+      doc.text(item.label, legendX+7, finalY+17);
+      legendX += 145;
+    });
+
+    const signY = finalY + 62;
+    doc.setDrawColor(125,131,138);
+    doc.setTextColor(80,86,93);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(8);
+
+    const blockWidth = 210;
+    const positions = [
+      marginX,
+      (pageWidth-blockWidth)/2,
+      pageWidth-marginX-blockWidth
+    ];
+    const labels = [
+      'Responsável pela inspeção',
+      'Supervisor / responsável pela área',
+      'Data'
+    ];
+
+    positions.forEach((x,index)=>{
+      doc.line(x, signY, x+blockWidth, signY);
+      doc.text(labels[index], x+blockWidth/2, signY+13, {align:'center'});
+    });
+
+    // Rodapé e paginação em todas as páginas.
+    const totalPages = doc.internal.getNumberOfPages();
+    for(let page=1; page<=totalPages; page++){
+      doc.setPage(page);
+      drawFooter(page,totalPages);
+    }
+
+    doc.save(`relatorio-extintores-${todayISO()}.pdf`);
+    showToast("PDF profissional gerado com sucesso");
+  }catch(err){
+    console.error(err);
+    showToast("Erro ao gerar o PDF: "+err.message, "err");
+  }
+}
+
+function generateIndividualPdf(e){
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({unit:'pt', format:'a4'});
+  const cfg = STATE.config;
+  if(cfg.logo){ try{ doc.addImage(cfg.logo,'JPEG',40,30,40,40); }catch(err){} }
+  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.text(cfg.companyName || 'Empresa', 92, 48);
+  doc.setFontSize(11); doc.setFont('helvetica','normal');
+  doc.text(`Ficha do extintor #${e.numero}`, 92, 64);
+
+  let y = 100;
+  if(e.foto){ try{ doc.addImage(e.foto,'JPEG',40,y,140,140); }catch(err){} }
+  doc.setFontSize(10);
+  const info = [
+    ['Localização', e.localizacao], ['Usina', e.usina], ['Agente', e.agente],
+    ['Capacidade', e.capacidade||'—'], ['Situação', e.statusGeral],
+    ['Vencimento recarga', fmtDate(e.dataRecarga)+" — "+dateStatus(e.dataRecarga).label],
+    ['Vencimento TH', fmtDate(e.dataTH)+" — "+dateStatus(e.dataTH,false).label],
+  ];
+  let ty = y+8;
+  info.forEach(([k,v])=>{ doc.setFont('helvetica','bold'); doc.text(k+':', 200, ty); doc.setFont('helvetica','normal'); doc.text(String(v), 300, ty); ty+=18; });
+
+  const history = STATE.inspections.filter(i=>i.extinguisherId===e.id).sort((a,b)=>b.date.localeCompare(a.date));
+  doc.autoTable({
+    startY: y+150,
+    head:[['Data','Resultado','Responsável','Observações']],
+    body: history.length? history.map(h=>[fmtDate(h.date), h.resultado, h.responsavel, h.observacoes||'—']) : [['—','—','—','Nenhuma inspeção registrada']],
+    styles:{fontSize:8.5},
+    headStyles:{fillColor:[224,67,42], textColor:255},
+    margin:{left:40,right:40},
+  });
+  doc.save(`extintor-${e.numero}.pdf`);
+  showToast("PDF do extintor gerado");
+}
+
+function printAllLabels(){
+  if(STATE.extinguishers.length===0){ showToast("Nenhum extintor cadastrado","err"); return; }
+  const holder = document.getElementById('print-area');
+  holder.innerHTML = `<div class="print-only" style="display:flex;flex-wrap:wrap;gap:16px;padding:30px;">
+    ${STATE.extinguishers.map(e=>`
+      <div class="qr-label-preview" style="width:150px;">
+        <div class="top-stripe"></div>
+        <div id="qr-all-${e.id}" style="display:flex;justify-content:center;"></div>
+        <b style="font-size:11px;">#${escapeHtml(e.numero)} — ${escapeHtml(e.localizacao)}</b>
+        <div class="company" style="font-size:8px;">${escapeHtml(STATE.config.companyName)}</div>
+      </div>`).join('')}
+  </div>`;
+  STATE.extinguishers.forEach(e=>{ new QRCode(document.getElementById('qr-all-'+e.id), {text:extinguisherDirectUrl(e.id), width:100, height:100}); });
+  setTimeout(()=>window.print(), 250);
+}
+
+/* ============================================================
+   CONFIGURAÇÕES
+============================================================ */
+function renderSettings(){
+  setHeader("Configurações","Empresa, usinas, agentes extintores e limites de alerta");
+  const cfg = STATE.config;
+  const content = document.getElementById('content');
+  content.innerHTML = `
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="section-title" style="margin-top:0;">Empresa / Logotipo</div>
+        <div class="field"><label>Nome da empresa (aparece no PDF)</label><input type="text" id="s-company" value="${escapeHtml(cfg.companyName)}"></div>
+        <div class="field"><label>Logotipo</label>
+          <label class="photo-upload" style="height:110px;">
+            ${cfg.logo?`<img src="${cfg.logo}">`:`${ICONS.upload}<span>Enviar logotipo</span>`}
+            <input type="file" accept="image/*" id="s-logo">
+          </label>
+        </div>
+        <div class="field"><label>Limite de dias para status "Alerta" (recarga)</label><input type="number" id="s-alertdays" value="${cfg.alertDays}"></div>
+        <button class="btn btn-accent" id="s-save-company" style="width:100%;justify-content:center;">Salvar configurações</button>
+      </div>
+      <div class="card">
+        <div class="section-title" style="margin-top:0;">Usinas</div>
+        <div id="usina-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
+        <div style="display:flex;gap:6px;"><input type="text" id="new-usina" placeholder="Nova usina" style="flex:1;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:13px;"><button class="btn" id="add-usina">${ICONS.plus}</button></div>
+
+        <div class="section-title">Agentes extintores</div>
+        <div id="agent-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
+        <div style="display:flex;gap:6px;"><input type="text" id="new-agent" placeholder="Novo agente" style="flex:1;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:13px;"><button class="btn" id="add-agent">${ICONS.plus}</button></div>
+      </div>
+    </div>
+  `;
+  renderListEditable('usina-list', cfg.usinas, removeUsina);
+  renderListEditable('agent-list', cfg.agents, removeAgent);
+
+  document.getElementById('s-logo').addEventListener('change', async ev=>{
+    const file = ev.target.files[0]; if(!file) return;
+    cfg.logo = await fileToDataUrl(file, 300);
+    renderSettings();
+  });
+  document.getElementById('s-save-company').addEventListener('click', async ()=>{
+    cfg.companyName = document.getElementById('s-company').value.trim() || cfg.companyName;
+    cfg.alertDays = parseInt(document.getElementById('s-alertdays').value)||30;
+    await persistConfig();
+    renderShell();
+    showToast("Configurações salvas");
+  });
+  document.getElementById('add-usina').addEventListener('click', async ()=>{
+    const v = document.getElementById('new-usina').value.trim();
+    if(v && !cfg.usinas.includes(v)){ cfg.usinas.push(v); await persistConfig(); renderSettings(); }
+  });
+  document.getElementById('add-agent').addEventListener('click', async ()=>{
+    const v = document.getElementById('new-agent').value.trim();
+    if(v && !cfg.agents.includes(v)){ cfg.agents.push(v); await persistConfig(); renderSettings(); }
+  });
+}
+function renderListEditable(elId, arr, removeFn){
+  const el = document.getElementById(elId);
+  el.innerHTML = arr.map((v,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;background:var(--panel-2);border:1px solid var(--border-soft);padding:7px 10px;border-radius:7px;font-size:13px;">
+    <span>${escapeHtml(v)}</span><button class="icon-btn" data-i="${i}">${ICONS.trash}</button></div>`).join('') || `<p style="color:var(--muted);font-size:12.5px;">Nenhum item.</p>`;
+  el.querySelectorAll('[data-i]').forEach(b=>b.addEventListener('click', ()=>removeFn(parseInt(b.dataset.i))));
+}
+async function removeUsina(i){ STATE.config.usinas.splice(i,1); await persistConfig(); renderSettings(); }
+async function removeAgent(i){ STATE.config.agents.splice(i,1); await persistConfig(); renderSettings(); }
+
+
+/* ============================================================
+   AUTENTICAÇÃO
+============================================================ */
+async function waitForAuthState(){
+  if(!FIREBASE_AUTH) return null;
+  const { onAuthStateChanged } =
+    await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js");
+
+  return await new Promise(resolve=>{
+    const unsub = onAuthStateChanged(FIREBASE_AUTH, user=>{
+      unsub();
+      AUTH_USER = user || null;
+      resolve(AUTH_USER);
+    });
+  });
+}
+
+function renderLogin(){
+  document.getElementById('app').innerHTML = `
+    <div style="min-height:100vh;width:100%;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg);">
+      <div class="card" style="width:100%;max-width:380px;padding:24px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+          <div class="brand-logo">${ICONS.fire}</div>
+          <div>
+            <div style="font-family:var(--font-display);font-size:20px;font-weight:600;">Controle de Extintores</div>
+            <div style="font-size:12px;color:var(--muted);">Acesso privado</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>E-mail</label>
+          <input type="text" id="login-email" autocomplete="username" placeholder="seuemail@exemplo.com">
+        </div>
+
+        <div class="field">
+          <label>Senha</label>
+          <input type="password" id="login-password" autocomplete="current-password" placeholder="Sua senha"
+            style="background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 11px;font-size:13.5px;width:100%;">
+        </div>
+
+        <button class="btn btn-accent" id="login-btn" style="width:100%;justify-content:center;margin-top:4px;">Entrar</button>
+        <div id="login-error" style="margin-top:12px;font-size:12px;color:var(--danger);display:none;"></div>
+      </div>
+    </div>
+  `;
+
+  const btn = document.getElementById('login-btn');
+  const emailEl = document.getElementById('login-email');
+  const passEl = document.getElementById('login-password');
+  const errEl = document.getElementById('login-error');
+
+  async function doLogin(){
+    const email = emailEl.value.trim();
+    const password = passEl.value;
+
+    if(!email || !password){
+      errEl.textContent = "Informe o e-mail e a senha.";
+      errEl.style.display = "block";
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Entrando...";
+    errEl.style.display = "none";
+
+    try{
+      const { signInWithEmailAndPassword } =
+        await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js");
+
+      const cred = await signInWithEmailAndPassword(FIREBASE_AUTH, email, password);
+      AUTH_USER = cred.user;
+      await loadAll();
+      renderShell();
+      openRequestedExtinguisherFromUrl();
+    }catch(e){
+      console.error("Login error", e);
+      errEl.textContent = "E-mail ou senha incorretos.";
+      errEl.style.display = "block";
+      btn.disabled = false;
+      btn.textContent = "Entrar";
+    }
+  }
+
+  btn.addEventListener('click', doLogin);
+  passEl.addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+}
+
+async function logout(){
+  try{
+    const { signOut } =
+      await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js");
+    await signOut(FIREBASE_AUTH);
+    AUTH_USER = null;
+    renderLogin();
+  }catch(e){
+    console.error("Logout error", e);
+    showToast("Não foi possível sair da conta.","err");
+  }
+}
+
+/* ============================================================
+   BOOT
+============================================================ */
+async function boot(){
+  document.getElementById('app').innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;width:100%;color:var(--muted);font-size:13px;">Conectando...</div>`;
+
+  const firebaseOk = await initFirebase();
+
+  if(!firebaseOk){
+    document.getElementById('app').innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;width:100%;color:var(--danger);font-size:13px;padding:20px;text-align:center;">Não foi possível conectar ao Firebase.</div>`;
+    return;
+  }
+
+  await waitForAuthState();
+
+  if(AUTH_USER){
+    await loadAll();
+    renderShell();
+    openRequestedExtinguisherFromUrl();
+  }else{
+    renderLogin();
+  }
+}
+boot();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{ /* offline caching is optional */ });
+  });
+}
+</script>
+</body>
+</html>
