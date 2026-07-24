@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Gestão de Extintores</title>
+<meta name="application-name" content="Gestão de Extintores">
+<meta name="theme-color" content="#12161b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Extintores">
+<meta name="description" content="Sistema de gestão, inspeções, QR Code, relatórios e tratativas de extintores.">
+
+<link rel="canonical" href="https://xandremattos-ship-it.github.io/controle-extintores/">
+
+<meta property="og:locale" content="pt_BR">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Gestão de Extintores">
+<meta property="og:title" content="Gestão de Extintores">
+<meta property="og:description" content="Controle, inspeções, QR Code, relatórios e tratativas de extintores em um só sistema.">
+<meta property="og:url" content="https://xandremattos-ship-it.github.io/controle-extintores/">
+<meta property="og:image" content="https://xandremattos-ship-it.github.io/controle-extintores/share-preview-v3.2.12.4.jpg">
+<meta property="og:image:secure_url" content="https://xandremattos-ship-it.github.io/controle-extintores/share-preview-v3.2.12.4.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Gestão de Extintores — sistema de controle e inspeções">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Gestão de Extintores">
+<meta name="twitter:description" content="Controle, inspeções, QR Code, relatórios e tratativas de extintores.">
+<meta name="twitter:image" content="https://xandremattos-ship-it.github.io/controle-extintores/share-preview-v3.2.12.4.jpg">
+<meta name="twitter:image:alt" content="Gestão de Extintores">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+<link rel="stylesheet" href="./css/app.css?v=3.2.12.4">
+<link rel="stylesheet" href="./css/offline.css?v=3.2.12.4">
+</head>
+<body>
+
+<div id="pwa-splash" class="pwa-splash" aria-hidden="true">
+  <div class="pwa-splash-inner">
+    <div class="pwa-splash-logo"><img src="./icon-512.png" alt="Gestão de Extintores" style="width:100%;height:100%;object-fit:cover;border-radius:24px;"></div>
+    <div class="pwa-splash-title">Gestão de Extintores</div>
+    <div class="pwa-splash-sub">Carregando dados com segurança...</div>
+    <div class="pwa-splash-loader"><i></i></div>
+  </div>
+</div>
+
+
+<div id="app"></div>
+
+<div id="mobile-profile-backdrop" class="mobile-profile-backdrop"></div>
+<div id="mobile-profile-menu" class="mobile-profile-menu" role="dialog" aria-modal="true" aria-label="Menu do usuário">
+  <div class="mobile-profile-head">
+    <div class="mobile-profile-avatar"><img src="./icon-192.png" alt=""></div>
+    <div>
+      <div class="mobile-profile-name" id="mobile-profile-name">Usuário</div>
+      <div class="mobile-profile-role" id="mobile-profile-role">Perfil</div>
+      <div class="mobile-profile-scope" id="mobile-profile-scope">Usina</div>
+    </div>
+  </div>
+  <div class="mobile-profile-actions">
+    <button type="button" class="mobile-profile-action" id="mobile-profile-account">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      Minha conta
+    </button>
+    <button type="button" class="mobile-profile-action" id="mobile-profile-password">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      Alterar senha
+    </button>
+    <button type="button" class="mobile-profile-action" id="mobile-profile-appinfo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 10v6"/><path d="M12 7h.01"/></svg>
+      Informações do aplicativo
+    </button>
+    <button type="button" class="mobile-profile-action danger" id="mobile-profile-logout">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 4v16h-8"/></svg>
+      Sair
+    </button>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+<div id="print-area"></div>
+<div id="pwa-update-banner" class="pwa-update-banner" role="status" aria-live="polite">
+  <div class="pwa-update-title">Nova versão disponível</div>
+  <div class="pwa-update-text">
+    Uma atualização do sistema foi encontrada. Atualize quando não estiver preenchendo uma inspeção.
+  </div>
+  <div class="pwa-update-actions">
+    <button type="button" class="btn btn-accent" id="pwa-update-now">Atualizar agora</button>
+    <button type="button" class="btn" id="pwa-update-later">Depois</button>
+  </div>
+</div>
+
+
+<script src="./js/offline.js?v=3.2.12.4"></script>
+<script src="./js/app.js?v=3.2.12.4"></script>
