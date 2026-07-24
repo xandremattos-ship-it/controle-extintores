@@ -1,0 +1,150 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function profilePath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function hasProfile() {
+      return signedIn() && exists(profilePath());
+    }
+
+    function profile() {
+      return get(profilePath()).data;
+    }
+
+    function profileStatusIsActive() {
+      return hasProfile()
+        && profile().active == true
+        && (
+          !('status' in profile())
+          || profile().status == 'ATIVO'
+        );
+    }
+
+    function isAdmin() {
+      return profileStatusIsActive()
+        && profile().role == 'ADMINISTRADOR';
+    }
+
+    function isInspector() {
+      return profileStatusIsActive()
+        && profile().role == 'INSPETOR';
+    }
+
+    function isViewer() {
+      return profileStatusIsActive()
+        && profile().role == 'VISUALIZADOR';
+    }
+
+    function sameUsina(data) {
+      return (
+        isAdmin()
+        || (
+          (isInspector() || isViewer())
+          && data.usina == profile().usina
+        )
+      );
+    }
+
+    function validPublicPendingProfile(uid) {
+      return signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'name',
+          'email',
+          'role',
+          'usina',
+          'status',
+          'active',
+          'requestedAt',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 3
+        && request.resource.data.role == ''
+        && request.resource.data.usina == ''
+        && request.resource.data.status == 'PENDENTE'
+        && request.resource.data.active == false;
+    }
+
+    match /users/{uid} {
+      allow get: if signedIn()
+        && (
+          request.auth.uid == uid
+          || isAdmin()
+        );
+
+      allow list: if isAdmin();
+
+      allow create: if isAdmin()
+        || validPublicPendingProfile(uid);
+
+      allow update, delete: if isAdmin();
+    }
+
+    match /settings/{documentId} {
+      allow read: if profileStatusIsActive();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /extinguishers/{documentId} {
+      allow read: if profileStatusIsActive()
+        && sameUsina(resource.data);
+
+      allow create: if isAdmin()
+        || (
+          isInspector()
+          && request.resource.data.usina == profile().usina
+        );
+
+      allow update: if isAdmin()
+        || (
+          isInspector()
+          && resource.data.usina == profile().usina
+          && request.resource.data.usina == profile().usina
+        );
+
+      allow delete: if isAdmin()
+        || (
+          isInspector()
+          && resource.data.usina == profile().usina
+        );
+    }
+
+    match /inspections/{documentId} {
+      allow read: if profileStatusIsActive()
+        && sameUsina(resource.data);
+
+      allow create: if isAdmin()
+        || (
+          isInspector()
+          && request.resource.data.usina == profile().usina
+        );
+
+      allow update: if isAdmin()
+        || (
+          isInspector()
+          && resource.data.usina == profile().usina
+          && request.resource.data.usina == profile().usina
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    // Compatibilidade temporária para migração de dados antigos.
+    match /appData/{documentId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
