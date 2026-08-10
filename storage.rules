@@ -1,0 +1,192 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userProfile() {
+      return firestore.get(
+        /databases/(default)/documents/users/$(request.auth.uid)
+      ).data;
+    }
+
+    function activeUser() {
+      return signedIn()
+        && userProfile().active == true
+        && userProfile().status == 'ATIVO';
+    }
+
+    function hasAllUsinasAccess() {
+      return activeUser()
+        && userProfile().role in [
+          'PROPRIETARIO',
+          'ADMINISTRADOR'
+        ];
+    }
+
+    function isInspector() {
+      return activeUser()
+        && userProfile().role == 'INSPETOR';
+    }
+
+    function sameUsina(usina) {
+      return activeUser()
+        && userProfile().usina == usina;
+    }
+
+    function canReadEquipment(usina) {
+      return hasAllUsinasAccess()
+        || sameUsina(usina);
+    }
+
+    function canWriteEquipment(usina) {
+      return hasAllUsinasAccess()
+        || (
+          isInspector()
+          && sameUsina(usina)
+        );
+    }
+
+    function validImageUpload() {
+      return request.resource != null
+        && request.resource.size <= 3 * 1024 * 1024
+        && request.resource.contentType.matches(
+          'image/(jpeg|png|webp)'
+        );
+    }
+
+    function validEquipmentImageName(fileName) {
+      return fileName.matches(
+        '^(foto|thumb)\\.(webp|png|jpg|jpeg)$'
+      );
+    }
+
+    function extinguisherData(extinguisherId) {
+      return firestore.get(
+        /databases/(default)/documents/extinguishers/$(extinguisherId)
+      ).data;
+    }
+
+    function hydrantData(hydrantId) {
+      return firestore.get(
+        /databases/(default)/documents/hydrants/$(hydrantId)
+      ).data;
+    }
+
+    /*
+      Diagnóstico da Parte 1.
+      Cada usuário só pode criar e remover o próprio arquivo temporário.
+    */
+    match /system-tests/{userId}/{fileName} {
+      allow read: if activeUser()
+        && request.auth.uid == userId;
+
+      allow create, update: if activeUser()
+        && request.auth.uid == userId
+        && fileName.matches(
+          '^storage-test\\.(webp|png)$'
+        )
+        && validImageUpload();
+
+      allow delete: if activeUser()
+        && request.auth.uid == userId;
+    }
+
+    /*
+      Estrutura preparada para as próximas etapas.
+      Nesta v4.1.0 o sistema ainda NÃO envia fotos de equipamentos
+      para estes caminhos.
+    */
+    match /extintores/{extinguisherId}/{fileName} {
+      /*
+        A usina fica gravada nos metadados da própria imagem.
+        Isso permite enviar a foto antes de o documento novo do
+        extintor chegar ao Firestore, sem abrir acesso entre usinas.
+      */
+      allow read: if activeUser()
+        && resource.metadata.keys().hasAll([
+          'usina',
+          'equipmentId',
+          'kind'
+        ])
+        && resource.metadata.equipmentId == extinguisherId
+        && resource.metadata.kind == 'extinguisher-photo'
+        && canReadEquipment(resource.metadata.usina);
+
+      allow create, update: if activeUser()
+        && validEquipmentImageName(fileName)
+        && validImageUpload()
+        && request.resource.metadata.keys().hasAll([
+          'usina',
+          'equipmentId',
+          'kind',
+          'uploadedBy'
+        ])
+        && request.resource.metadata.equipmentId == extinguisherId
+        && request.resource.metadata.kind == 'extinguisher-photo'
+        && request.resource.metadata.uploadedBy == request.auth.uid
+        && canWriteEquipment(request.resource.metadata.usina);
+
+      allow delete: if activeUser()
+        && resource.metadata.keys().hasAll([
+          'usina',
+          'equipmentId',
+          'kind'
+        ])
+        && resource.metadata.equipmentId == extinguisherId
+        && resource.metadata.kind == 'extinguisher-photo'
+        && canWriteEquipment(resource.metadata.usina);
+    }
+
+    match /hidrantes/{hydrantId}/{fileName} {
+      /*
+        A usina fica nos metadados da imagem.
+        Isso permite enviar a foto de um hidrante novo antes de o
+        documento chegar ao Firestore, sem abrir acesso entre usinas.
+      */
+      allow read: if activeUser()
+        && resource.metadata.keys().hasAll([
+          'usina',
+          'equipmentId',
+          'kind'
+        ])
+        && resource.metadata.equipmentId == hydrantId
+        && resource.metadata.kind == 'hydrant-photo'
+        && canReadEquipment(resource.metadata.usina);
+
+      allow create, update: if activeUser()
+        && validEquipmentImageName(fileName)
+        && validImageUpload()
+        && request.resource.metadata.keys().hasAll([
+          'usina',
+          'equipmentId',
+          'kind',
+          'uploadedBy'
+        ])
+        && request.resource.metadata.equipmentId == hydrantId
+        && request.resource.metadata.kind == 'hydrant-photo'
+        && request.resource.metadata.uploadedBy == request.auth.uid
+        && canWriteEquipment(request.resource.metadata.usina);
+
+      allow delete: if activeUser()
+        && resource.metadata.keys().hasAll([
+          'usina',
+          'equipmentId',
+          'kind'
+        ])
+        && resource.metadata.equipmentId == hydrantId
+        && resource.metadata.kind == 'hydrant-photo'
+        && canWriteEquipment(resource.metadata.usina);
+    }
+
+    /*
+      Tudo que não estiver explicitamente previsto acima fica bloqueado.
+    */
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
