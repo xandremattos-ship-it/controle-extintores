@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'gestao-incendio-v4.1.5.1-correcao-imagens-firebase-edge';
+const CACHE_VERSION = 'gestao-incendio-v4.1.5-automacao-painel-manutencao';
 
 self.addEventListener('install',event=>{
   /*
