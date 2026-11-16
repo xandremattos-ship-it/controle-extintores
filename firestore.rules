@@ -3,6 +3,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    /*
+      RECUPERAÇÃO v4.1.5 — acesso ao próprio perfil.
+      Regra explícita e restrita: cada usuário autenticado só pode
+      ler o documento users cujo ID é o próprio UID.
+    */
+    match /users/{selfUserId} {
+      allow get: if request.auth != null
+        && request.auth.uid == selfUserId;
+    }
+
     function signedIn() {
       return request.auth != null;
     }
