@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'gestao-incendio-v4.1.5-automacao-painel-manutencao';
+const CACHE_VERSION = 'gestao-incendio-v4.1.5.3-storage-image-loader';
 
 self.addEventListener('install',event=>{
   /*
